@@ -1,0 +1,77 @@
+# Compiler and flags
+CXX = g++
+CXXFLAGS = -std=c++17 -O3
+LDFLAGS =
+LIBS =
+
+# Directories
+SRC_DIR = src
+BIN_DIR = bin
+TEST_DIR = test
+
+# Boost settings - adjust paths as needed
+ifdef BOOST_ROOT
+  BOOST_INC = -I$(BOOST_ROOT)
+else
+  BOOST_INC = -I/usr/include
+endif
+
+# Files
+SRCS = $(wildcard $(SRC_DIR)/*.cpp)
+OBJS = $(patsubst $(SRC_DIR)/%.cpp,$(BIN_DIR)/%.o,$(SRCS))
+MAIN_OBJ = $(BIN_DIR)/main.o
+PROG_OBJS = $(filter-out $(MAIN_OBJ),$(OBJS))
+
+# Main executable
+TARGET = $(BIN_DIR)/max_flow
+
+# Test executables
+CORRECTNESS_TEST = $(BIN_DIR)/correctness_test
+PERFORMANCE_TEST = $(BIN_DIR)/performance_test
+
+# Default target
+all: $(BIN_DIR) $(TARGET)
+
+# Create bin directory
+$(BIN_DIR):
+	mkdir -p $(BIN_DIR)
+
+# Main executable
+$(TARGET): $(OBJS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $^ -o $@ $(LIBS)
+
+# Sequential version (without OpenMP)
+sequential: CXXFLAGS += -DSEQUENTIAL
+sequential: clean all
+
+# Parallel version (with OpenMP)
+parallel: CXXFLAGS += -fopenmp -DPARALLEL
+parallel: LDFLAGS += -fopenmp
+parallel: LIBS += -fopenmp
+parallel: clean all
+
+# Compile source files
+$(BIN_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BIN_DIR)
+	$(CXX) $(CXXFLAGS) $(BOOST_INC) -c $< -o $@
+
+# Correctness test
+$(CORRECTNESS_TEST): $(TEST_DIR)/correctness_test.cpp $(PROG_OBJS) | $(BIN_DIR)
+	$(CXX) $(CXXFLAGS) $(BOOST_INC) $(LDFLAGS) $^ -o $@ $(LIBS)
+
+# Performance test
+$(PERFORMANCE_TEST): $(TEST_DIR)/performance_test.cpp $(PROG_OBJS) | $(BIN_DIR)
+	$(CXX) $(CXXFLAGS) $(BOOST_INC) $(LDFLAGS) $^ -o $@ $(LIBS)
+
+# Run correctness test
+test: $(CORRECTNESS_TEST)
+	./$(CORRECTNESS_TEST)
+
+# Run performance test
+benchmark: $(PERFORMANCE_TEST)
+	./$(PERFORMANCE_TEST)
+
+# Clean
+clean:
+	rm -rf $(BIN_DIR)/*.o $(TARGET) $(CORRECTNESS_TEST) $(PERFORMANCE_TEST)
+
+.PHONY: all sequential parallel test benchmark clean
