@@ -6,7 +6,7 @@ void FlowNetwork::addEdge(int from, int to, int capacity) {
     // Add forward edge
     graph[from].push_back(Edge(to, capacity, 0, graph[to].size()));
     
-    // Add reverse edge with 0 capacity (residual edge)
+    // Add residual edge w/ 0 capacity
     graph[to].push_back(Edge(from, 0, 0, graph[from].size() - 1));
 }
 
@@ -46,7 +46,7 @@ bool FlowNetwork::saveToFile(const std::string& filename) const {
 
     file << num_vertices << std::endl;
     
-    // Write edges with positive capacity (forward edges)
+    // Write forward edges
     for (int from = 0; from < num_vertices; ++from) {
         for (const auto& edge : graph[from]) {
             if (edge.capacity > 0) {

@@ -12,16 +12,16 @@ class PushRelabelParallel;   // Will be implemented later
 
 class MaxFlowTester {
 public:
-    // Test correctness with Boost's push-relabel algorithm
+    // Compare results with Boost
     static bool verifyCorrectness(const FlowNetwork& network, int source, int sink, int computed_flow);
     
-    // Use Boost to compute the expected max flow
+    // Compute max flow using Boost
     static int computeExpectedFlow(const FlowNetwork& network, int source, int sink);
     
     // Compare sequential and parallel implementations
     static bool compareImplementations(const FlowNetwork& network, int source, int sink);
 
-    // Run benchmarks and print results
+    // Run benchmarks, print results
     static void runBenchmark(const std::vector<FlowNetwork>& networks, 
                             int source, int sink,
                             int num_runs = 5);
@@ -46,4 +46,4 @@ private:
     std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
 };
 
-#endif // TEST_H
+#endif

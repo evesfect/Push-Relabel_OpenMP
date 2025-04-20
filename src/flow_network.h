@@ -12,7 +12,7 @@ public:
         int to;
         int capacity;
         int flow;
-        int rev; // Index of reverse edge
+        int rev; // INDEX of reverse edge
 
         Edge(int t, int c, int f, int r) : to(t), capacity(c), flow(f), rev(r) {}
     };
@@ -23,7 +23,7 @@ public:
     int getNumVertices() const;
     const std::vector<std::vector<Edge>>& getGraph() const;
 
-    // For testing and visualization
+    // For debug/testing/report
     void print() const;
     bool saveToFile(const std::string& filename) const;
     static FlowNetwork loadFromFile(const std::string& filename);
@@ -33,4 +33,4 @@ private:
     std::vector<std::vector<Edge>> graph;
 };
 
-#endif // FLOW_NETWORK_H
+#endif

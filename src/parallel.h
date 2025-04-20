@@ -14,4 +14,4 @@ public:
     static int maxFlow(FlowNetwork& network, int source, int sink, int num_threads = 0);
 };
 
-#endif // PARALLEL_H
+#endif

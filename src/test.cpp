@@ -3,7 +3,7 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/push_relabel_max_flow.hpp>
 
-// Function to convert our flow network to Boost graph
+// Convert flow network to Boost graph
 boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS,
                      boost::no_property,
                      boost::property<boost::edge_capacity_t, int,
@@ -18,6 +18,7 @@ boost::adjacency_list<boost::vecS, boost::vecS, boost::directedS,
                                             >
                          >::edge_descriptor
                      >>>>
+
 convertToBoostGraph(const FlowNetwork& network) {
     using namespace boost;
     
@@ -73,7 +74,6 @@ int MaxFlowTester::computeExpectedFlow(const FlowNetwork& network, int source, i
     using namespace boost;
     auto g = convertToBoostGraph(network);
     
-    // Use Boost's push-relabel algorithm to compute max flow
     return push_relabel_max_flow(g, source, sink);
 }
 
@@ -90,15 +90,15 @@ bool MaxFlowTester::verifyCorrectness(const FlowNetwork& network, int source, in
     }
 }
 
+// TODO:
 bool MaxFlowTester::compareImplementations(const FlowNetwork& network, int source, int sink) {
-    // This will be implemented after sequential and parallel versions are done
     std::cout << "Implementation comparison not yet available." << std::endl;
     return false;
 }
 
+// TODO:
 void MaxFlowTester::runBenchmark(const std::vector<FlowNetwork>& networks, 
                                int source, int sink,
                                int num_runs) {
-    // This will be implemented after sequential and parallel versions are done
     std::cout << "Benchmarking not yet available." << std::endl;
 }
