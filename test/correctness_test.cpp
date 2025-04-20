@@ -30,15 +30,25 @@ void testTinyGraph() {
     int expected_flow = MaxFlowTester::computeExpectedFlow(network, source, sink);
     std::cout << "Expected max flow: " << expected_flow << std::endl;
     
-    // Test our sequential implementation
-    int sequential_flow = PushRelabelSequential::maxFlow(network, source, sink);
-    bool correct = MaxFlowTester::verifyCorrectness(network, source, sink, sequential_flow);
+    // Test sequential implementation
+    FlowNetwork network_seq = network;
+    int sequential_flow = PushRelabelSequential::maxFlow(network_seq, source, sink);
+    bool seq_correct = MaxFlowTester::verifyCorrectness(network_seq, source, sink, sequential_flow);
     
-    if (correct) {
-        std::cout << "Tiny graph test passed!" << std::endl;
-    } else {
-        std::cout << "Tiny graph test failed!" << std::endl;
-    }
+    std::cout << "Sequential result: " << (seq_correct ? "CORRECT" : "INCORRECT") 
+              << " (flow = " << sequential_flow << ")" << std::endl;
+    
+    // Test parallel implementation
+    #ifdef _OPENMP
+    FlowNetwork network_par = network;
+    int parallel_flow = PushRelabelParallel::maxFlow(network_par, source, sink, 2);
+    bool par_correct = MaxFlowTester::verifyCorrectness(network_par, source, sink, parallel_flow);
+    
+    std::cout << "Parallel result: " << (par_correct ? "CORRECT" : "INCORRECT") 
+              << " (flow = " << parallel_flow << ")" << std::endl;
+    #else
+    std::cout << "OpenMP not enabled, skipping parallel test" << std::endl;
+    #endif
 }
 
 void testSmallGraph() {
@@ -69,21 +79,31 @@ void testSmallGraph() {
     int expected_flow = MaxFlowTester::computeExpectedFlow(network, source, sink);
     std::cout << "Expected max flow: " << expected_flow << std::endl;
     
-    // Test our sequential implementation
-    int sequential_flow = PushRelabelSequential::maxFlow(network, source, sink);
-    bool correct = MaxFlowTester::verifyCorrectness(network, source, sink, sequential_flow);
+    // Test sequential implementation
+    FlowNetwork network_seq = network;
+    int sequential_flow = PushRelabelSequential::maxFlow(network_seq, source, sink);
+    bool seq_correct = MaxFlowTester::verifyCorrectness(network_seq, source, sink, sequential_flow);
     
-    if (correct) {
-        std::cout << "Small graph test passed!" << std::endl;
-    } else {
-        std::cout << "Small graph test failed!" << std::endl;
-    }
+    std::cout << "Sequential result: " << (seq_correct ? "CORRECT" : "INCORRECT") 
+              << " (flow = " << sequential_flow << ")" << std::endl;
+    
+    // Test parallel implementation
+    #ifdef _OPENMP
+    FlowNetwork network_par = network;
+    int parallel_flow = PushRelabelParallel::maxFlow(network_par, source, sink, 2);
+    bool par_correct = MaxFlowTester::verifyCorrectness(network_par, source, sink, parallel_flow);
+    
+    std::cout << "Parallel result: " << (par_correct ? "CORRECT" : "INCORRECT") 
+              << " (flow = " << parallel_flow << ")" << std::endl;
+    #else
+    std::cout << "OpenMP not enabled, skipping parallel test" << std::endl;
+    #endif
 }
 
 void testRandomGraph() {
     std::cout << "\n=== Testing Random Graph ===" << std::endl;
     
-    // Generate a random flow network (smaller than before)
+    // Generate a random flow network (smaller for testing)
     FlowNetworkGenerator generator(42); // Fixed seed for reproducibility
     FlowNetwork network = generator.generateRandom(10, 0.3, 1, 100);
     
@@ -95,24 +115,37 @@ void testRandomGraph() {
     int expected_flow = MaxFlowTester::computeExpectedFlow(network, source, sink);
     std::cout << "Expected max flow: " << expected_flow << std::endl;
     
-    // Test our sequential implementation
-    int sequential_flow = PushRelabelSequential::maxFlow(network, source, sink);
-    bool correct = MaxFlowTester::verifyCorrectness(network, source, sink, sequential_flow);
+    // Test sequential implementation
+    FlowNetwork network_seq = network;
+    int sequential_flow = PushRelabelSequential::maxFlow(network_seq, source, sink);
+    bool seq_correct = MaxFlowTester::verifyCorrectness(network_seq, source, sink, sequential_flow);
     
-    if (correct) {
-        std::cout << "Random graph test passed!" << std::endl;
-    } else {
-        std::cout << "Random graph test failed!" << std::endl;
-    }
+    std::cout << "Sequential result: " << (seq_correct ? "CORRECT" : "INCORRECT") 
+              << " (flow = " << sequential_flow << ")" << std::endl;
+    
+    // Test parallel implementation
+    #ifdef _OPENMP
+    FlowNetwork network_par = network;
+    int parallel_flow = PushRelabelParallel::maxFlow(network_par, source, sink, 2);
+    bool par_correct = MaxFlowTester::verifyCorrectness(network_par, source, sink, parallel_flow);
+    
+    std::cout << "Parallel result: " << (par_correct ? "CORRECT" : "INCORRECT") 
+              << " (flow = " << parallel_flow << ")" << std::endl;
+    #else
+    std::cout << "OpenMP not enabled, skipping parallel test" << std::endl;
+    #endif
 }
 
 int main() {
     try {
+        // Start with the smallest test
         testTinyGraph();
+        
+        // Then test slightly larger graphs
         testSmallGraph();
         testRandomGraph();
         
-        std::cout << "\nTesting terminated." << std::endl;
+        std::cout << "\nAll tests completed!" << std::endl;
         return 0;
     }
     catch (const std::exception& e) {

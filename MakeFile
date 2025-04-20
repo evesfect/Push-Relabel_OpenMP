@@ -45,7 +45,7 @@ sequential: CXXFLAGS += -DSEQUENTIAL
 sequential: clean all
 
 # Parallel version (with OpenMP)
-parallel: CXXFLAGS += -fopenmp -DPARALLEL
+parallel: CXXFLAGS += -fopenmp
 parallel: LDFLAGS += -fopenmp
 parallel: LIBS += -fopenmp
 parallel: clean all
@@ -54,13 +54,13 @@ parallel: clean all
 $(BIN_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(BOOST_INC) -c $< -o $@
 
-# Correctness test
+# Correctness test - always with OpenMP support
 $(CORRECTNESS_TEST): $(TEST_DIR)/correctness_test.cpp $(PROG_OBJS) | $(BIN_DIR)
-	$(CXX) $(CXXFLAGS) $(BOOST_INC) $(LDFLAGS) $^ -o $@ $(LIBS)
+	$(CXX) $(CXXFLAGS) -fopenmp $(BOOST_INC) $(LDFLAGS) -fopenmp $^ -o $@ $(LIBS) -fopenmp
 
-# Performance test
+# Performance test - always with OpenMP support
 $(PERFORMANCE_TEST): $(TEST_DIR)/performance_test.cpp $(PROG_OBJS) | $(BIN_DIR)
-	$(CXX) $(CXXFLAGS) $(BOOST_INC) $(LDFLAGS) $^ -o $@ $(LIBS)
+	$(CXX) $(CXXFLAGS) -fopenmp $(BOOST_INC) $(LDFLAGS) -fopenmp $^ -o $@ $(LIBS) -fopenmp
 
 # Run correctness test
 test: $(CORRECTNESS_TEST)
@@ -70,8 +70,21 @@ test: $(CORRECTNESS_TEST)
 benchmark: $(PERFORMANCE_TEST)
 	./$(PERFORMANCE_TEST)
 
+# Parallel versions of test targets - build everything with OpenMP support
+test-parallel: CXXFLAGS += -fopenmp
+test-parallel: LDFLAGS += -fopenmp
+test-parallel: LIBS += -fopenmp
+test-parallel: clean $(CORRECTNESS_TEST)
+	./$(CORRECTNESS_TEST)
+
+benchmark-parallel: CXXFLAGS += -fopenmp
+benchmark-parallel: LDFLAGS += -fopenmp
+benchmark-parallel: LIBS += -fopenmp
+benchmark-parallel: clean $(PERFORMANCE_TEST)
+	./$(PERFORMANCE_TEST)
+
 # Clean
 clean:
 	rm -rf $(BIN_DIR)/*.o $(TARGET) $(CORRECTNESS_TEST) $(PERFORMANCE_TEST)
 
-.PHONY: all sequential parallel test benchmark clean
+.PHONY: all sequential parallel test benchmark test-parallel benchmark-parallel clean

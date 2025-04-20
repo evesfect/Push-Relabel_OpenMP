@@ -67,8 +67,6 @@ int main(int argc, char* argv[]) {
             int expected_flow = MaxFlowTester::computeExpectedFlow(network, source, sink);
             std::cout << "Expected max flow: " << expected_flow << std::endl;
             
-            // In future: Test our sequential and parallel implementations
-            std::cout << "Note: Sequential and parallel implementations not yet available" << std::endl;
         }
         else if (command == "-b" || command == "--benchmark") {
             if (argc < 5) {
@@ -85,7 +83,6 @@ int main(int argc, char* argv[]) {
             FlowNetwork network = FlowNetwork::loadFromFile(filename);
             std::vector<FlowNetwork> networks = {network};
             
-            // In future: Run benchmarks for sequential and parallel implementations
             std::cout << "Note: Benchmarking not yet available" << std::endl;
         }
         else {

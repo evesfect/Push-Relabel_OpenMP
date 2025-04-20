@@ -6,6 +6,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <iomanip>
 
 void runBenchmark(int size, double edge_prob, int min_cap, int max_cap, int runs) {
     std::cout << "=== Benchmark: Network size " << size 
@@ -22,37 +23,85 @@ void runBenchmark(int size, double edge_prob, int min_cap, int max_cap, int runs
     int expected_flow = MaxFlowTester::computeExpectedFlow(network, source, sink);
     std::cout << "Expected max flow: " << expected_flow << std::endl;
     
-    // Time the sequential algorithm
-    Timer timer;
-    double total_time = 0.0;
+    // Benchmark sequential algorithm
+    std::cout << "\nSequential Push-Relabel:" << std::endl;
+    double seq_total_time = 0.0;
+    int seq_flow = 0;
     
-    std::cout << "Sequential Push-Relabel:" << std::endl;
     for (int i = 0; i < runs; ++i) {
-        network.resetFlow();
-        timer.reset();
+        // Create a copy of the network for each run
+        FlowNetwork network_copy = network;
         
-        // Sequential implementation will be added later
-        // int flow = PushRelabelSequential::maxFlow(network, source, sink);
-        
+        Timer timer;
+        seq_flow = PushRelabelSequential::maxFlow(network_copy, source, sink);
         double elapsed = timer.elapsed();
-        total_time += elapsed;
+        seq_total_time += elapsed;
         
-        // std::cout << "  Run " << (i+1) << ": " << elapsed << " ms" << std::endl;
+        std::cout << "  Run " << (i+1) << ": " << elapsed << " ms, flow = " << seq_flow << std::endl;
+        
+        // Verify correctness
+        bool correct = (seq_flow == expected_flow);
+        if (!correct) {
+            std::cout << "  ERROR: Sequential flow doesn't match expected flow" << std::endl;
+        }
     }
     
-    std::cout << "  Average: " << (total_time / runs) << " ms" << std::endl;
+    double seq_avg_time = seq_total_time / runs;
+    std::cout << "  Average: " << seq_avg_time << " ms" << std::endl;
     
-    // Time the parallel algorithm (will be added later)
-    std::cout << "Parallel Push-Relabel:" << std::endl;
-    std::cout << "  Not yet implemented" << std::endl;
+    // Benchmark parallel algorithm with different thread counts
+    int max_threads = 8; // Adjust based on your system
+    
+    #ifdef _OPENMP
+    std::cout << "\nParallel Push-Relabel:" << std::endl;
+    
+    for (int num_threads = 2; num_threads <= max_threads; num_threads *= 2) {
+        double par_total_time = 0.0;
+        int par_flow = 0;
+        
+        std::cout << "\n  Using " << num_threads << " threads:" << std::endl;
+        
+        for (int i = 0; i < runs; ++i) {
+            // Create a copy of the network for each run
+            FlowNetwork network_copy = network;
+            
+            Timer timer;
+            par_flow = PushRelabelParallel::maxFlow(network_copy, source, sink, num_threads);
+            double elapsed = timer.elapsed();
+            par_total_time += elapsed;
+            
+            std::cout << "    Run " << (i+1) << ": " << elapsed << " ms, flow = " << par_flow << std::endl;
+            
+            // Verify correctness
+            bool correct = (par_flow == expected_flow);
+            if (!correct) {
+                std::cout << "    ERROR: Parallel flow doesn't match expected flow" << std::endl;
+            }
+        }
+        
+        double par_avg_time = par_total_time / runs;
+        double speedup = seq_avg_time / par_avg_time;
+        
+        std::cout << "    Average: " << par_avg_time << " ms" << std::endl;
+        std::cout << "    Speedup: " << std::fixed << std::setprecision(2) << speedup << "x" << std::endl;
+    }
+    #else
+    std::cout << "\nOpenMP not enabled, skipping parallel benchmark" << std::endl;
+    #endif
 }
 
 int main() {
     try {
         // Run benchmarks for different sized networks
-        runBenchmark(100, 0.1, 1, 100, 5);
-        runBenchmark(500, 0.05, 1, 100, 5);
-        runBenchmark(1000, 0.01, 1, 100, 3);
+        // Start with small networks for testing
+        runBenchmark(50, 0.2, 1, 100, 3);
+        
+        // Medium networks
+        runBenchmark(100, 0.1, 1, 100, 3);
+        
+        // Larger networks (uncomment when ready for more intensive testing)
+        // runBenchmark(200, 0.05, 1, 100, 3);
+        // runBenchmark(500, 0.02, 1, 100, 2);
         
         std::cout << "\nAll benchmarks completed." << std::endl;
         return 0;

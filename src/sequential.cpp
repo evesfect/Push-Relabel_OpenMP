@@ -7,7 +7,7 @@
 int PushRelabelSequential::maxFlow(FlowNetwork& network, int source, int sink) {
     int n = network.getNumVertices();
     
-    std::cout << "Starting Push-Relabel with " << n << " vertices (source=" 
+    std::cout << "Starting with " << n << " vertices (source=" 
               << source << ", sink=" << sink << ")" << std::endl;
     
     // Validate source and sink
@@ -40,11 +40,6 @@ int PushRelabelSequential::maxFlow(FlowNetwork& network, int source, int sink) {
         discharge(graph, excess, height, active_vertices, in_queue, u, source, sink, total_relabels);
         
         iterations++;
-        if (iterations % 10000 == 0) {
-            std::cout << "Completed " << iterations << " iterations, " 
-                      << active_vertices.size() << " active vertices, "
-                      << total_relabels << " total relabels" << std::endl;
-        }
     }
     
     if (iterations >= MAX_ITERATIONS) {
@@ -58,10 +53,11 @@ int PushRelabelSequential::maxFlow(FlowNetwork& network, int source, int sink) {
         max_flow += edge.flow;
     }
     
-    std::cout << "Push-Relabel completed in " << iterations << " iterations" << std::endl;
+    std::cout << "Completed in " << iterations << " iterations" << std::endl;
     std::cout << "Max flow: " << max_flow << std::endl;
     
-    // Sanity check: validate flow conservation
+    // Sanity check - commented out
+    /*
     int sink_flow = 0;
     for (size_t i = 0; i < graph.size(); i++) {
         for (const auto& edge : graph[i]) {
@@ -71,7 +67,7 @@ int PushRelabelSequential::maxFlow(FlowNetwork& network, int source, int sink) {
         }
     }
     std::cout << "Flow into sink: " << sink_flow << " (should match max flow)" << std::endl;
-    
+    */
     delete[] in_queue;
     return max_flow;
 }
@@ -81,7 +77,6 @@ void PushRelabelSequential::initialize(const std::vector<std::vector<FlowNetwork
                                      std::vector<int>& excess, std::vector<int>& height,
                                      std::queue<int>& active_vertices, bool* in_queue,
                                      int source, int sink, int n) {
-    std::cout << "Initializing preflow..." << std::endl;
     
     // Set source height to n
     height[source] = n;
@@ -106,7 +101,7 @@ void PushRelabelSequential::initialize(const std::vector<std::vector<FlowNetwork
         }
     }
     
-    std::cout << "Initialization complete. Active vertices: " << active_vertices.size() << std::endl;
+    //std::cout << "Initialization complete. Active vertices: " << active_vertices.size() << std::endl;
 }
 
 // Push operation - push flow from u to v
