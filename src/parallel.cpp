@@ -3,6 +3,10 @@
 #include <algorithm>
 #include <iomanip>
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 int PushRelabelParallel::maxFlow(FlowNetwork& network, int source, int sink, int num_threads) {
     int n = network.getNumVertices();
     
@@ -21,9 +25,9 @@ int PushRelabelParallel::maxFlow(FlowNetwork& network, int source, int sink, int
     
     auto& graph = const_cast<std::vector<std::vector<FlowNetwork::Edge>>&>(network.getGraph());
     
-    std::vector<int> excess(n, 0);       // Excess flow of each vertex
-    std::vector<int> height(n, 0);       // Height of each vertex
-    std::queue<int> active_vertices;     // Queue of active vertices
+    std::vector<int> excess(n, 0);
+    std::vector<int> height(n, 0);
+    boost::lockfree::queue<int> active_vertices(n);
     bool* in_queue = new bool[n]();
     
     // Initialize preflow
@@ -34,11 +38,9 @@ int PushRelabelParallel::maxFlow(FlowNetwork& network, int source, int sink, int
     
     // Main Loop
     // Works on vertices with excess flow
-    while (!active_vertices.empty() && iterations < MAX_ITERATIONS) {
+    int u;
+    while (active_vertices.pop(u) && iterations < MAX_ITERATIONS) {
         // Choose an active vertex
-        int u = active_vertices.front();
-        
-        active_vertices.pop();
         in_queue[u] = false;
         
         discharge(graph, excess, height, active_vertices, in_queue, u, source, sink, total_relabels);
@@ -67,7 +69,7 @@ int PushRelabelParallel::maxFlow(FlowNetwork& network, int source, int sink, int
 // Initialize preflow - saturate edges from source
 void PushRelabelParallel::initialize(const std::vector<std::vector<FlowNetwork::Edge>>& graph,
                                      std::vector<int>& excess, std::vector<int>& height,
-                                     std::queue<int>& active_vertices, bool* in_queue,
+                                     boost::lockfree::queue<int>& active_vertices, bool* in_queue,
                                      int source, int sink, int n) {
     
     // Set source height to n
@@ -96,7 +98,7 @@ void PushRelabelParallel::initialize(const std::vector<std::vector<FlowNetwork::
 
 // Push operation - push flow from u to v
 bool PushRelabelParallel::push(std::vector<std::vector<FlowNetwork::Edge>>& graph,
-                               std::vector<int>& excess, std::queue<int>& active_vertices,
+                               std::vector<int>& excess, boost::lockfree::queue<int>& active_vertices,
                                bool* in_queue, int u, int v_idx) {
     auto& edge = graph[u][v_idx];
     auto& rev_edge = graph[edge.to][edge.rev];
@@ -152,7 +154,7 @@ bool PushRelabelParallel::relabel(const std::vector<std::vector<FlowNetwork::Edg
 
 void PushRelabelParallel::discharge(std::vector<std::vector<FlowNetwork::Edge>>& graph,
                                     std::vector<int>& excess, std::vector<int>& height,
-                                    std::queue<int>& active_vertices, bool* in_queue,
+                                    boost::lockfree::queue<int>& active_vertices, bool* in_queue,
                                     int u, int source, int sink, int& total_relabels) {
     // Skip the source and the sink
     if (u == source || u == sink) return;
@@ -199,34 +201,4 @@ void PushRelabelParallel::discharge(std::vector<std::vector<FlowNetwork::Edge>>&
         active_vertices.push(u);
         in_queue[u] = true;
     }
-}
-
-// (DEBUG)
-void PushRelabelParallel::printState(const std::vector<std::vector<FlowNetwork::Edge>>& graph,
-                                     const std::vector<int>& excess, const std::vector<int>& height,
-                                     const std::queue<int>& active_vertices, int n) {
-    std::cout << "Current State:" << std::endl;
-
-    std::cout << "  Heights: ";
-    for (int i = 0; i < n; i++) {
-        std::cout << height[i] << " ";
-    }
-    std::cout << std::endl;
-    
-    std::cout << "  Excess: ";
-    for (int i = 0; i < n; i++) {
-        std::cout << excess[i] << " ";
-    }
-    std::cout << std::endl;
-    
-    std::cout << "  Flow network:" << std::endl;
-    for (int u = 0; u < n; u++) {
-        for (const auto& edge : graph[u]) {
-            if (edge.capacity > 0) {  // Only print forward edges
-                std::cout << "    " << u << " -> " << edge.to 
-                          << " (flow=" << edge.flow << "/" << edge.capacity << ")" << std::endl;
-            }
-        }
-    }
-    std::cout << std::endl;
 }

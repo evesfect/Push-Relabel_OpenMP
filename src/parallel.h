@@ -5,7 +5,8 @@
 #include <queue>
 #include <vector>
 #include <iostream>
-#include <omp.h>  // Include OpenMP for future parallelization
+#include <omp.h>
+#include <boost/lockfree/queue.hpp>
 
 class PushRelabelParallel {
 public:
@@ -18,11 +19,11 @@ private:
 
     static void initialize(const std::vector<std::vector<FlowNetwork::Edge>>& graph,
                           std::vector<int>& excess, std::vector<int>& height,
-                          std::queue<int>& active_vertices, bool* in_queue,
+                          boost::lockfree::queue<int>& active_vertices, bool* in_queue,
                           int source, int sink, int n);
     
     static bool push(std::vector<std::vector<FlowNetwork::Edge>>& graph,
-                    std::vector<int>& excess, std::queue<int>& active_vertices,
+                    std::vector<int>& excess, boost::lockfree::queue<int>& active_vertices,
                     bool* in_queue, int u, int v_idx);
     
     static bool relabel(const std::vector<std::vector<FlowNetwork::Edge>>& graph,
@@ -30,12 +31,9 @@ private:
     
     static void discharge(std::vector<std::vector<FlowNetwork::Edge>>& graph,
                         std::vector<int>& excess, std::vector<int>& height,
-                        std::queue<int>& active_vertices, bool* in_queue,
+                        boost::lockfree::queue<int>& active_vertices, bool* in_queue,
                         int u, int source, int sink, int& total_relabels);
     
-    static void printState(const std::vector<std::vector<FlowNetwork::Edge>>& graph,
-                          const std::vector<int>& excess, const std::vector<int>& height,
-                          const std::queue<int>& active_vertices, int n);
 };
 
 #endif
