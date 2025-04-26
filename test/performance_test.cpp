@@ -94,14 +94,14 @@ int main() {
     try {
         // Run benchmarks for different sized networks
         // Start with small networks for testing
-        runBenchmark(50, 0.2, 1, 100, 3);
+        runBenchmark(50, 0.2, 1, 100, 5);
         
         // Medium networks
-        runBenchmark(100, 0.1, 1, 100, 3);
+        runBenchmark(100, 0.1, 1, 100, 5);
         
         // Larger networks (uncomment when ready for more intensive testing)
         // runBenchmark(200, 0.05, 1, 100, 3);
-        runBenchmark(100, 0.5, 1, 100, 2);
+        runBenchmark(1000, 0.1, 1, 100, 10);
         
         std::cout << "\nAll benchmarks completed." << std::endl;
         return 0;

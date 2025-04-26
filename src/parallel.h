@@ -1,55 +1,52 @@
+// parallel.h
 #ifndef PARALLEL_H
 #define PARALLEL_H
 
 #include "flow_network.h"
 #include <vector>
 #include <iostream>
-#include <omp.h>
+#include <queue>
+#include <omp.h> // Keep OpenMP include for future parallelization
+#include <limits>
 
 class PushRelabelParallel {
 public:
-    static const int MAX_ITERATIONS = 100000000;
-    
+    static const int MAX_ITERATIONS = 100000000; // Consider adjusting if needed
+    static const int INF_HEIGHT = std::numeric_limits<int>::max(); // For global relabeling
+
     static int maxFlow(FlowNetwork& network, int source, int sink, int num_threads = 0);
-    
+
 private:
     // Initialization
     static void initialize(const std::vector<std::vector<FlowNetwork::Edge>>& graph,
                           std::vector<int>& excess, std::vector<int>& height,
-                          std::vector<int>& active_vertices, std::vector<bool>& is_active,
-                          int& active_count, int source, int sink, int n);
-    
-    // Phase 1: Push operations - store changes in temporary arrays
-    static void pushPhase(std::vector<std::vector<FlowNetwork::Edge>>& graph,
-                         const std::vector<int>& excess, const std::vector<int>& height,
-                         std::vector<int>& excess_changes, const std::vector<int>& active_vertices,
-                         std::vector<bool>& still_active, int active_count, int source, int sink);
-    
-    // Phase 2: Compute new labels for vertices that are still active
-    static void labelComputationPhase(const std::vector<std::vector<FlowNetwork::Edge>>& graph,
-                                     const std::vector<int>& excess, const std::vector<int>& height,
-                                     std::vector<int>& new_heights, const std::vector<bool>& still_active);
-    
-    // Phase 3: Apply the new labels
-    static void labelApplicationPhase(std::vector<int>& height, const std::vector<int>& new_heights,
-                                     const std::vector<bool>& still_active);
-    
-    // Phase 4: Apply excess changes and update active vertices
-    static void excessUpdatePhase(std::vector<int>& excess, const std::vector<int>& excess_changes,
-                                 std::vector<int>& next_active_vertices, std::vector<bool>& is_active,
-                                 int& active_count, int source, int sink, int n);
-    
-    // Helper functions
+                          std::queue<int>& active_vertices, std::vector<bool>& in_queue, // Changed to vector<bool>
+                          int source, int sink, int n);
+
+    // Push operation
     static bool push(std::vector<std::vector<FlowNetwork::Edge>>& graph,
-                    const std::vector<int>& excess, std::vector<int>& excess_changes,
-                    int u, int v_idx);
-    
-    static bool computeNewLabel(const std::vector<std::vector<FlowNetwork::Edge>>& graph,
-                              const std::vector<int>& height, int u, int& new_height);
-    
+                    std::vector<int>& excess, std::vector<int>& height, // Added height
+                    std::queue<int>& active_vertices, std::vector<bool>& in_queue,
+                    int u, int v_idx, int source, int sink); // Added height, source, sink
+
+    // Relabel operation
+    static bool relabel(const std::vector<std::vector<FlowNetwork::Edge>>& graph,
+                       std::vector<int>& height, int u, int n); // Added n
+
+    // Discharge operation
+    static int discharge(std::vector<std::vector<FlowNetwork::Edge>>& graph,
+                        std::vector<int>& excess, std::vector<int>& height,
+                        std::queue<int>& active_vertices, std::vector<bool>& in_queue,
+                        int u, int source, int sink, int n); // Added n, returns relabel count
+
+    // Global Relabeling Heuristic
+    static void globalRelabel(std::vector<std::vector<FlowNetwork::Edge>>& graph, // Needs non-const graph to access reverse edges
+                             std::vector<int>& height, int source, int sink, int n);
+
+    // Debug helper
     static void printState(const std::vector<std::vector<FlowNetwork::Edge>>& graph,
                           const std::vector<int>& excess, const std::vector<int>& height,
-                          const std::vector<int>& active_vertices, int active_count, int n);
+                          const std::queue<int>& active_vertices, int n);
 };
 
-#endif
+#endif // PARALLEL_H
