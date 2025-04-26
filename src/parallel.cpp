@@ -30,25 +30,27 @@ int PushRelabelParallel::maxFlow(FlowNetwork& network, int source, int sink, int
     std::vector<int> excess_changes(n, 0);       // Temporary storage for excess changes
     std::vector<int> new_heights(n, 0);          // Temporary storage for new heights
     
-    std::set<int> active_vertices;               // Current active vertices
-    std::set<int> next_active_vertices;          // Active vertices for next iteration
-    std::set<int> still_active;                  // Vertices still active after push phase
+    std::vector<int> active_vertices(n);         // Current active vertices
+    std::vector<bool> is_active(n, false);       // Track if vertex is active
+    std::vector<bool> still_active(n, false);    // Track if vertex is still active after push
+    std::vector<int> next_active_vertices(n);    // Active vertices for next iteration
+    int active_count = 0;                        // Number of active vertices
+    int next_active_count = 0;                   // Number of active vertices for next iteration
     
-    // Initialize preflow
-    initialize(graph, excess, height, active_vertices, next_active_vertices, source, sink, n);
+    initialize(graph, excess, height, active_vertices, is_active, active_count, source, sink, n);
     
     int iterations = 0;
     
     // Main loop - continue until no active vertices remain
-    while (!active_vertices.empty() && iterations < MAX_ITERATIONS) {
+    while (active_count > 0 && iterations < MAX_ITERATIONS) {
         // Clear temporary structures
         std::fill(excess_changes.begin(), excess_changes.end(), 0);
         std::fill(new_heights.begin(), new_heights.end(), 0);
-        still_active.clear();
-        next_active_vertices.clear();
+        std::fill(still_active.begin(), still_active.end(), false);
+        next_active_count = 0;
         
         // Phase 1: Process all active vertices and compute excess changes
-        pushPhase(graph, excess, height, excess_changes, active_vertices, still_active, source, sink);
+        pushPhase(graph, excess, height, excess_changes, active_vertices, still_active, active_count, source, sink);
         
         // Phase 2: Compute new labels for vertices that are still active
         labelComputationPhase(graph, excess, height, new_heights, still_active);
@@ -57,10 +59,11 @@ int PushRelabelParallel::maxFlow(FlowNetwork& network, int source, int sink, int
         labelApplicationPhase(height, new_heights, still_active);
         
         // Phase 4: Apply excess changes and update active vertices for next iteration
-        excessUpdatePhase(excess, excess_changes, still_active, next_active_vertices, source, sink);
+        excessUpdatePhase(excess, excess_changes, next_active_vertices, is_active, next_active_count, source, sink, n);
         
-        // Swap active vertex sets for next iteration
+        // Swap active vertices for next iteration
         active_vertices.swap(next_active_vertices);
+        active_count = next_active_count;
         
         iterations++;
     }
@@ -83,11 +86,12 @@ int PushRelabelParallel::maxFlow(FlowNetwork& network, int source, int sink, int
 
 // Initialize preflow - saturate edges from source
 void PushRelabelParallel::initialize(const std::vector<std::vector<FlowNetwork::Edge>>& graph,
-                                    std::vector<int>& excess, std::vector<int>& height,
-                                    std::set<int>& active_vertices, std::set<int>& next_active_vertices,
-                                    int source, int sink, int n) {
+                                     std::vector<int>& excess, std::vector<int>& height,
+                                     std::vector<int>& active_vertices, std::vector<bool>& is_active,
+                                     int& active_count, int source, int sink, int n) {
     // Set source height to n
     height[source] = n;
+    active_count = 0;
     
     // Saturate all edges from source
     for (size_t i = 0; i < graph[source].size(); i++) {
@@ -102,40 +106,42 @@ void PushRelabelParallel::initialize(const std::vector<std::vector<FlowNetwork::
         // Update excess flow
         excess[edge.to] += flow;
         
-        // Add neighbor to active vertices if it's not source or sink and has excess
-        if (edge.to != source && edge.to != sink && excess[edge.to] > 0) {
-            active_vertices.insert(edge.to);
+        // Add to active vertices if it's not source or sink and has excess
+        if (edge.to != source && edge.to != sink && excess[edge.to] > 0 && !is_active[edge.to]) {
+            is_active[edge.to] = true;
+            active_vertices[active_count++] = edge.to;
         }
     }
 }
 
 // Phase 1: Push operations - store changes in temporary arrays
 void PushRelabelParallel::pushPhase(std::vector<std::vector<FlowNetwork::Edge>>& graph,
-                                   const std::vector<int>& excess, const std::vector<int>& height,
-                                   std::vector<int>& excess_changes, std::set<int>& active_vertices,
-                                   std::set<int>& still_active, int source, int sink) {
+                                    const std::vector<int>& excess, const std::vector<int>& height,
+                                    std::vector<int>& excess_changes, const std::vector<int>& active_vertices,
+                                    std::vector<bool>& still_active, int active_count, int source, int sink) {
     // Process each active vertex
-    for (int u : active_vertices) {
+    for (int i = 0; i < active_count; i++) {
+        int u = active_vertices[i];
         if (u == source || u == sink) continue;
         
         bool pushed = false;
         
         // Check all edges for possible pushes
-        for (size_t i = 0; i < graph[u].size(); i++) {
-            auto& edge = graph[u][i];
+        for (size_t j = 0; j < graph[u].size(); j++) {
+            auto& edge = graph[u][j];
             
-            // Check if edge is admissible (has residual capacity and satisfies height constraint)
+            // Check if edge is admissible
             if (edge.capacity > edge.flow && height[u] == height[edge.to] + 1) {
-                // Attempt to push flow, store changes in excess_changes
-                if (push(graph, excess, excess_changes, u, i)) {
+                // Attempt to push flow
+                if (push(graph, excess, excess_changes, u, j)) {
                     pushed = true;
                 }
             }
         }
         
-        // If vertex is still active after all push attempts, add to still_active
+        // If vertex is still active after all push attempts
         if (excess[u] + excess_changes[u] > 0) {
-            still_active.insert(u);
+            still_active[u] = true;
         }
     }
 }
@@ -168,15 +174,17 @@ bool PushRelabelParallel::push(std::vector<std::vector<FlowNetwork::Edge>>& grap
 // Phase 2: Compute new labels for vertices that are still active
 void PushRelabelParallel::labelComputationPhase(const std::vector<std::vector<FlowNetwork::Edge>>& graph,
                                               const std::vector<int>& excess, const std::vector<int>& height,
-                                              std::vector<int>& new_heights, std::set<int>& still_active) {
+                                              std::vector<int>& new_heights, const std::vector<bool>& still_active) {
     // Compute new heights for vertices that are still active
-    for (int u : still_active) {
-        int new_height;
-        if (computeNewLabel(graph, height, u, new_height)) {
-            new_heights[u] = new_height;
-        } else {
-            // If relabeling fails, keep the old height
-            new_heights[u] = height[u];
+    for (int u = 0; u < still_active.size(); u++) {
+        if (still_active[u]) {
+            int new_height;
+            if (computeNewLabel(graph, height, u, new_height)) {
+                new_heights[u] = new_height;
+            } else {
+                // If relabeling fails, keep the old height
+                new_heights[u] = height[u];
+            }
         }
     }
 }
@@ -204,21 +212,27 @@ bool PushRelabelParallel::computeNewLabel(const std::vector<std::vector<FlowNetw
 
 // Phase 3: Apply the new labels
 void PushRelabelParallel::labelApplicationPhase(std::vector<int>& height, const std::vector<int>& new_heights,
-                                              std::set<int>& still_active) {
+                                              const std::vector<bool>& still_active) {
     // Apply new heights to vertices that are still active
-    for (int u : still_active) {
-        if (new_heights[u] > height[u]) {
-            height[u] = new_heights[u];
+    for (int u = 0; u < still_active.size(); u++) {
+        if (still_active[u]) {
+            if (new_heights[u] > height[u]) {
+                height[u] = new_heights[u];
+            }
         }
     }
 }
 
 // Phase 4: Apply excess changes and update active vertices
 void PushRelabelParallel::excessUpdatePhase(std::vector<int>& excess, const std::vector<int>& excess_changes,
-                                          std::set<int>& still_active, std::set<int>& next_active_vertices,
-                                          int source, int sink) {
+                                          std::vector<int>& next_active_vertices, std::vector<bool>& is_active,
+                                          int& next_active_count, int source, int sink, int n) {
+    // Reset active tracking
+    std::fill(is_active.begin(), is_active.end(), false);
+    next_active_count = 0;
+    
     // Apply excess changes and determine active vertices for next iteration
-    for (int i = 0; i < excess.size(); i++) {
+    for (int i = 0; i < n; i++) {
         // Skip source and sink
         if (i == source || i == sink) continue;
         
@@ -227,7 +241,8 @@ void PushRelabelParallel::excessUpdatePhase(std::vector<int>& excess, const std:
         
         // If vertex has excess, add to next active set
         if (excess[i] > 0) {
-            next_active_vertices.insert(i);
+            is_active[i] = true;
+            next_active_vertices[next_active_count++] = i;
         }
     }
 }
@@ -235,7 +250,7 @@ void PushRelabelParallel::excessUpdatePhase(std::vector<int>& excess, const std:
 // Debug method to print current state
 void PushRelabelParallel::printState(const std::vector<std::vector<FlowNetwork::Edge>>& graph,
                                     const std::vector<int>& excess, const std::vector<int>& height,
-                                    const std::set<int>& active_vertices, int n) {
+                                    const std::vector<int>& active_vertices, int active_count, int n) {
     std::cout << "Current State:" << std::endl;
 
     std::cout << "  Heights: ";
@@ -251,8 +266,8 @@ void PushRelabelParallel::printState(const std::vector<std::vector<FlowNetwork::
     std::cout << std::endl;
     
     std::cout << "  Active vertices: ";
-    for (int v : active_vertices) {
-        std::cout << v << " ";
+    for (int i = 0; i < active_count; i++) {
+        std::cout << active_vertices[i] << " ";
     }
     std::cout << std::endl;
     

@@ -5,9 +5,6 @@
 #include <vector>
 #include <iostream>
 #include <omp.h>
-#include <boost/lockfree/queue.hpp>
-#include <atomic>  // For atomic operations
-#include <set>     // For active vertex set
 
 class PushRelabelParallel {
 public:
@@ -19,28 +16,28 @@ private:
     // Initialization
     static void initialize(const std::vector<std::vector<FlowNetwork::Edge>>& graph,
                           std::vector<int>& excess, std::vector<int>& height,
-                          std::set<int>& active_vertices, std::set<int>& next_active_vertices,
-                          int source, int sink, int n);
+                          std::vector<int>& active_vertices, std::vector<bool>& is_active,
+                          int& active_count, int source, int sink, int n);
     
     // Phase 1: Push operations - store changes in temporary arrays
     static void pushPhase(std::vector<std::vector<FlowNetwork::Edge>>& graph,
                          const std::vector<int>& excess, const std::vector<int>& height,
-                         std::vector<int>& excess_changes, std::set<int>& active_vertices,
-                         std::set<int>& still_active, int source, int sink);
+                         std::vector<int>& excess_changes, const std::vector<int>& active_vertices,
+                         std::vector<bool>& still_active, int active_count, int source, int sink);
     
     // Phase 2: Compute new labels for vertices that are still active
     static void labelComputationPhase(const std::vector<std::vector<FlowNetwork::Edge>>& graph,
                                      const std::vector<int>& excess, const std::vector<int>& height,
-                                     std::vector<int>& new_heights, std::set<int>& still_active);
+                                     std::vector<int>& new_heights, const std::vector<bool>& still_active);
     
     // Phase 3: Apply the new labels
     static void labelApplicationPhase(std::vector<int>& height, const std::vector<int>& new_heights,
-                                     std::set<int>& still_active);
+                                     const std::vector<bool>& still_active);
     
     // Phase 4: Apply excess changes and update active vertices
     static void excessUpdatePhase(std::vector<int>& excess, const std::vector<int>& excess_changes,
-                                 std::set<int>& still_active, std::set<int>& next_active_vertices,
-                                 int source, int sink);
+                                 std::vector<int>& next_active_vertices, std::vector<bool>& is_active,
+                                 int& active_count, int source, int sink, int n);
     
     // Helper functions
     static bool push(std::vector<std::vector<FlowNetwork::Edge>>& graph,
@@ -52,7 +49,7 @@ private:
     
     static void printState(const std::vector<std::vector<FlowNetwork::Edge>>& graph,
                           const std::vector<int>& excess, const std::vector<int>& height,
-                          const std::set<int>& active_vertices, int n);
+                          const std::vector<int>& active_vertices, int active_count, int n);
 };
 
 #endif
