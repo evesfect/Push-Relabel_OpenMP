@@ -105,11 +105,11 @@ void testRandomGraph() {
     
     // Generate a random flow network (smaller for testing)
     FlowNetworkGenerator generator(42); // Fixed seed for reproducibility
-    FlowNetwork network = generator.generateRandom(10, 0.3, 1, 100);
+    FlowNetwork network = generator.generateRandom(1000, 0.5, 1, 100);
     
     // Source and sink
     int source = 0;
-    int sink = 9;
+    int sink = 999;
     
     // Compute expected max flow using Boost
     int expected_flow = MaxFlowTester::computeExpectedFlow(network, source, sink);

@@ -9,7 +9,7 @@
 class PushRelabelSequential {
 public:
     // Added after experiencing infinite loops
-    static const int MAX_ITERATIONS = 1000000;
+    static const int MAX_ITERATIONS = 100000000;
     
     /// @brief Calculates maximum possible flow of a given flow network
     /// @param network 
