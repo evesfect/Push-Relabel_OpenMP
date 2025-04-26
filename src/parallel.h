@@ -8,7 +8,7 @@
 
 class PushRelabelParallel {
 public:
-    static const int MAX_ITERATIONS = 1000000;
+    static const int MAX_ITERATIONS = 100000000;
     
     static int maxFlow(FlowNetwork& network, int source, int sink, int num_threads = 0);
     

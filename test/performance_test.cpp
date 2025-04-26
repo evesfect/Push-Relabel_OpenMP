@@ -101,7 +101,7 @@ int main() {
         
         // Larger networks (uncomment when ready for more intensive testing)
         // runBenchmark(200, 0.05, 1, 100, 3);
-        // runBenchmark(500, 0.02, 1, 100, 2);
+        runBenchmark(100, 0.5, 1, 100, 2);
         
         std::cout << "\nAll benchmarks completed." << std::endl;
         return 0;
