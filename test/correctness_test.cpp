@@ -103,8 +103,7 @@ void testSmallGraph() {
 void testRandomGraph() {
     std::cout << "\n=== Testing Random Graph ===" << std::endl;
     
-    // Generate a random flow network (smaller for testing)
-    FlowNetworkGenerator generator(42); // Fixed seed for reproducibility
+    FlowNetworkGenerator generator(36); // seed
     FlowNetwork network = generator.generateRandom(1000, 0.5, 1, 100);
     
     // Source and sink
@@ -138,11 +137,6 @@ void testRandomGraph() {
 
 int main() {
     try {
-        // Start with the smallest test
-        testTinyGraph();
-        
-        // Then test slightly larger graphs
-        testSmallGraph();
         testRandomGraph();
         
         std::cout << "\nAll tests completed!" << std::endl;

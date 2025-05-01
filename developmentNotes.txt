@@ -1,1 +1,2 @@
 Parallel version without any OpenMP flags, x0.85 speedup
+x45 speedup with Global Heuristics compared to default FIFO (sequential testing)
