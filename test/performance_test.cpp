@@ -92,9 +92,9 @@ void runBenchmark(int size, double edge_prob, int min_cap, int max_cap, int runs
 
 int main() {
     try {
-        runBenchmark(50, 0.5, 1, 300, 3);
-        runBenchmark(100, 0.3, 1, 200, 3);       
-        runBenchmark(1000, 0.1, 1, 100, 3);
+        //runBenchmark(50, 0.5, 1, 300, 3);
+        //runBenchmark(100, 0.3, 1, 200, 3);       
+        runBenchmark(10000, 0.7, 1, 100, 1);
         
         std::cout << "\nAll benchmarks completed." << std::endl;
         return 0;
