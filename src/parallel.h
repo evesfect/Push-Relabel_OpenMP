@@ -15,6 +15,10 @@ public:
     static const int INF_HEIGHT = std::numeric_limits<int>::max(); // For global relabeling
 
     static int maxFlow(FlowNetwork& network, int source, int sink, int num_threads = 0);
+    static void globalRelabel(std::vector<std::vector<FlowNetwork::Edge>>& graph,
+                             std::vector<int>& height, int source, int sink, int n);
+    static void globalRelabel_timed(std::vector<std::vector<FlowNetwork::Edge>>& graph, // Function with detailed timings
+                                    std::vector<int>& height, int source, int sink, int n);
 
 private:
     // Initialization
@@ -38,10 +42,6 @@ private:
                         std::vector<int>& excess, std::vector<int>& height,
                         std::queue<int>& active_vertices, std::vector<bool>& in_queue,
                         int u, int source, int sink, int n); // Added n, returns relabel count
-
-    // Global Relabeling Heuristic
-    static void globalRelabel(std::vector<std::vector<FlowNetwork::Edge>>& graph, // Needs non-const graph to access reverse edges
-                             std::vector<int>& height, int source, int sink, int n);
 
     // Debug helper
     static void printState(const std::vector<std::vector<FlowNetwork::Edge>>& graph,

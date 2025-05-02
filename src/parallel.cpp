@@ -189,171 +189,297 @@ int PushRelabelParallel::discharge(std::vector<std::vector<FlowNetwork::Edge>>& 
     return relabels;
 }
 
-// Global relabel via backward BFS
-void PushRelabelParallel::globalRelabel(std::vector<std::vector<FlowNetwork::Edge>>& graph, // Needs non-const graph
-                                         std::vector<int>& height, int source, int sink, int n) {
+// Global relabel via backward BFS (TIMED VERSION)
+void PushRelabelParallel::globalRelabel_timed(std::vector<std::vector<FlowNetwork::Edge>>& graph, // Needs non-const graph
+                                              std::vector<int>& height, int source, int sink, int n) {
+    // Start overall timing
+    double start_time_total = 0.0;
+    #ifdef _OPENMP
+    start_time_total = omp_get_wtime();
+    #endif
 
-    // --- Start Timing (Optional) ---
-    // double start_time = 0;
-    // #ifdef _OPENMP
-    // start_time = omp_get_wtime();
-    // #endif
-    // --- End Timing ---
+    // 1. Initialization timing
+    double start_time_init = 0.0;
+    #ifdef _OPENMP
+    start_time_init = omp_get_wtime();
+    #endif
 
-    // 1. Initialization (Parallel)
-    // Use n as the initial "infinity" / unvisited marker.
+    // Initialize heights array
     #pragma omp parallel for schedule(static)
     for (int i = 0; i < n; ++i) {
         height[i] = n;
     }
-    // Set sink height and ensure it's marked correctly if n=0
-    if (n > 0) {
-       height[sink] = 0;
-    }
+    height[sink] = 0;
 
+    double end_time_init = 0.0;
+    #ifdef _OPENMP
+    end_time_init = omp_get_wtime();
+    #endif
 
-    // 2. Level-Synchronous BFS Setup
+    // 2. BFS Setup timing
+    double start_time_setup = 0.0;
+    #ifdef _OPENMP
+    start_time_setup = omp_get_wtime();
+    #endif
+
+    // Use vector for frontier (better cache locality than queue)
     std::vector<int> frontier;
-    if (n > 0) { // Avoid pushing sink if n=0
-       frontier.push_back(sink);
-    }
-    frontier.reserve(n); // Reserve space, helps avoid reallocations
+    frontier.reserve(n/4); // Reserve reasonable space but not too much
+    frontier.push_back(sink);
 
     std::vector<int> next_frontier;
-    next_frontier.reserve(n); // Reserve space
+    next_frontier.reserve(n/4);
 
     int current_level = 0;
-    int num_threads = 1; // Default to 1 if OpenMP is not used
+    int num_threads = 1;
     #ifdef _OPENMP
-    num_threads = omp_get_max_threads(); // Get number of threads available
+    num_threads = omp_get_max_threads();
     #endif
-    std::vector<std::vector<int>> local_next_frontiers(num_threads); // Thread-local lists
 
-    // 3. BFS Loop: Process level by level
+    // Thread-local frontiers - preallocate once and reuse
+    std::vector<std::vector<int>> local_frontiers(num_threads);
+    for (int i = 0; i < num_threads; ++i) {
+        local_frontiers[i].reserve(n/8); // Reserve space but avoid excessive allocation
+    }
+
+    double end_time_setup = 0.0;
+    #ifdef _OPENMP
+    end_time_setup = omp_get_wtime();
+    #endif
+
+    // 3. BFS Loop timing
+    double start_time_bfs = 0.0;
+    double total_time_merge = 0.0;
+    #ifdef _OPENMP
+    start_time_bfs = omp_get_wtime();
+    #endif
+
+    // Main BFS loop
     while (!frontier.empty()) {
-        // Clear thread-local lists for the new level
-        for (int i = 0; i < num_threads; ++i) {
-            local_next_frontiers[i].clear();
-            // Optional: Reserve estimated space in local lists if possible
+        // Clear all local frontiers at once
+        for (auto& local_frontier : local_frontiers) {
+            local_frontier.clear();
         }
-        next_frontier.clear(); // Clear the global next frontier from previous iteration
+        next_frontier.clear();
 
-        #pragma omp parallel // Start parallel region for processing the current frontier
+        // Process current level in parallel
+        #pragma omp parallel
         {
             int tid = 0;
             #ifdef _OPENMP
             tid = omp_get_thread_num();
             #endif
+            auto& my_local_frontier = local_frontiers[tid];
 
-            // Parallel loop over the current frontier nodes (v)
-            // Dynamic scheduling can be beneficial if processing time per node varies
-            #pragma omp for schedule(dynamic, 128) // Chunk size 128 as a starting point
+            // Parallel processing of frontier nodes
+            #pragma omp for schedule(dynamic, 64)
             for (size_t i = 0; i < frontier.size(); ++i) {
-                 int v = frontier[i];
+                int v = frontier[i];
 
-                 // Explore edges *entering* v in the residual graph.
-                 // Iterate through neighbors 'u' of 'v' (edge v->u exists).
-                 // Check the residual capacity of the *reverse* edge (u->v).
-                 for (const auto& edge_from_v : graph[v]) { // edge_from_v is v -> u
-                     int u = edge_from_v.to;
-                     int rev_edge_idx = edge_from_v.rev;
+                // For each node v, check incoming edges in residual graph
+                for (const auto& edge_from_v : graph[v]) {
+                    int u = edge_from_v.to;
+                    int rev_edge_idx = edge_from_v.rev;
 
-                     // --- Safety Check ---
-                     // Ensure u and rev_edge_idx are valid before accessing graph[u]
-                     if (u < 0 || u >= n || rev_edge_idx < 0 || rev_edge_idx >= graph[u].size()) {
-                         // This indicates a potential graph inconsistency. Log or handle.
-                         #pragma omp critical (GraphError)
-                         {
-                            std::cerr << "Warning (GR Parallel): Invalid reverse edge index encountered."
-                                      << " From V=" << v << ", To U=" << u << ", RevIdx=" << rev_edge_idx
-                                      << ", Graph[u].size=" << (u >= 0 && u < n ? graph[u].size() : -1) << std::endl;
-                         }
-                         continue;
-                     }
-                     // --- End Safety Check ---
+                    // Safety check
+                    if (u < 0 || u >= n || rev_edge_idx < 0 || 
+                        rev_edge_idx >= static_cast<int>(graph[u].size())) {
+                        continue;
+                    }
 
-                     const auto& edge_u_v = graph[u][rev_edge_idx]; // The actual edge u -> v
+                    const auto& edge_u_v = graph[u][rev_edge_idx];
 
-                     // Check if there's residual capacity FROM u TO v
-                     if (edge_u_v.capacity - edge_u_v.flow > 0) {
-                         // Check if u has already been visited/updated (height[u] < n)
-                         // Use atomic compare-and-swap (CAS) to ensure only one thread
-                         // updates height[u] and adds it to the next frontier *for this level*.
-
-                         int expected_height = n;         // Expect 'infinity' (n)
-                         int desired_height = current_level + 1; // New height for this level
-                         bool updated_by_this_thread = false;
-
-                         // --- Atomic Operation: Check and Set Height ---
-                         // We need to atomically check if height[u] == n and, if so, set it to desired_height.
-                         // OpenMP 5.0+ provides 'omp atomic compare capture'.
-                         // If using older versions, a critical section or std::atomic might be needed.
-
-                         // Using OpenMP atomic compare capture (preferred if available)
-                         #if _OPENMP >= 201811 // Check for OpenMP 5.0 or later
-                         #pragma omp atomic compare capture // seq_cst memory order by default
-                         { if (height[u] == expected_height) { height[u] = desired_height; updated_by_this_thread = true; } }
-                         #else
-                         // Fallback using a critical section (less performant)
-                         #pragma omp critical (UpdateHeightBFS)
-                         {
-                              if (height[u] == expected_height) { // Double-check inside critical
-                                  height[u] = desired_height;
-                                  updated_by_this_thread = true;
-                              }
-                         }
-                         #endif
-                         // --- End Atomic Operation ---
-
-                         // If this thread performed the update, add 'u' to its local list
-                         if (updated_by_this_thread) {
-                             local_next_frontiers[tid].push_back(u);
-                         }
-                     }
-                 } // End loop over neighbors of v
-            } // End parallel for loop over frontier (implicit barrier here)
+                    // Check if there's residual capacity from u to v
+                    if (edge_u_v.capacity - edge_u_v.flow > 0) {
+                        // Try to update height of u using a critical section
+                        bool updated = false;
+                        // Fast check outside critical section to reduce contention
+                        if (height[u] == n) { 
+                            #pragma omp critical (UpdateHeightBFS)
+                            {
+                                // Double-check inside critical section
+                                if (height[u] == n) { 
+                                    height[u] = current_level + 1;
+                                    updated = true;
+                                }
+                            }
+                        }
+                        if (updated) {
+                            my_local_frontier.push_back(u);
+                        }
+                    }
+                }
+            }
         } // End parallel region
 
-        // 4. Combine local frontiers into the global next frontier (Sequential Part)
-        // This merge step is typically fast relative to the parallel exploration.
-        size_t total_next_size = 0;
-        for(int i=0; i<num_threads; ++i) {
-            total_next_size += local_next_frontiers[i].size();
+        // Merge timing
+        double start_time_merge = 0.0;
+        #ifdef _OPENMP
+        start_time_merge = omp_get_wtime();
+        #endif
+
+        // Efficient merge of local frontiers
+        size_t total_size = 0;
+        for (const auto& local_frontier : local_frontiers) {
+            total_size += local_frontier.size();
         }
-        next_frontier.reserve(total_next_size); // Pre-allocate exact size
+        next_frontier.reserve(total_size);
 
-        for (int i = 0; i < num_threads; ++i) {
-             if (!local_next_frontiers[i].empty()) {
-                next_frontier.insert(next_frontier.end(),
-                                      std::make_move_iterator(local_next_frontiers[i].begin()),
-                                      std::make_move_iterator(local_next_frontiers[i].end()));
-                local_next_frontiers[i].clear(); // Clear local list after moving
-             }
+        for (const auto& local_frontier : local_frontiers) {
+            next_frontier.insert(next_frontier.end(), local_frontier.begin(), local_frontier.end());
         }
 
+        double end_time_merge = 0.0;
+        #ifdef _OPENMP
+        end_time_merge = omp_get_wtime();
+        total_time_merge += (end_time_merge - start_time_merge);
+        #endif
 
-        // Prepare for the next level
-        frontier.swap(next_frontier); // Use the newly populated list as the next frontier
-        // next_frontier is now empty (or holds old frontier data) and ready for next iteration
+        // Prepare for next level
+        frontier.swap(next_frontier);
+        current_level++;
+    }
 
-        if (!frontier.empty()) {
-            current_level++;
-        }
-    } // End while loop (BFS finished)
+    double end_time_bfs = 0.0;
+    #ifdef _OPENMP
+    end_time_bfs = omp_get_wtime();
+    #endif
 
-    // 5. Finalization
-    // Ensure source height is n (unless source == sink, which is handled by init)
-    if (n > 0 && source != sink) {
+    // 4. Finalization timing
+    double start_time_finalize = 0.0;
+    #ifdef _OPENMP
+    start_time_finalize = omp_get_wtime();
+    #endif
+
+    // Set source height to n
+    if (source != sink) {
         height[source] = n;
     }
 
-    // --- Stop Timing (Optional) ---
-    // #ifdef _OPENMP
-    // double end_time = omp_get_wtime();
-    // std::cout << "Parallel Global Relabel finished in " << (end_time - start_time)
-    //           << " seconds. Levels processed: " << current_level << std::endl;
-    // #endif
-    // --- End Timing ---
+    double end_time_finalize = 0.0;
+    double end_time_total = 0.0;
+    #ifdef _OPENMP
+    end_time_finalize = omp_get_wtime();
+    end_time_total = omp_get_wtime();
+    #endif
+
+    // Print timing results
+    #ifdef _OPENMP
+    std::cout << "Global Relabel Timings:" << std::endl
+              << "  - Initialization: " << (end_time_init - start_time_init) * 1000 << " ms" << std::endl
+              << "  - Setup:         " << (end_time_setup - start_time_setup) * 1000 << " ms" << std::endl
+              << "  - BFS Loop:      " << (end_time_bfs - start_time_bfs) * 1000 << " ms" << std::endl
+              << "    - Merge Time:  " << total_time_merge * 1000 << " ms" << std::endl
+              << "  - Finalization:  " << (end_time_finalize - start_time_finalize) * 1000 << " ms" << std::endl
+              << "  - Total Time:    " << (end_time_total - start_time_total) * 1000 << " ms" << std::endl
+              << "  - Levels:        " << current_level << std::endl;
+    #endif
+}
+
+// Global relabel via backward BFS (CLEAN VERSION - No Timers/Prints)
+void PushRelabelParallel::globalRelabel(std::vector<std::vector<FlowNetwork::Edge>>& graph, // Needs non-const graph
+                                        std::vector<int>& height, int source, int sink, int n) {
+
+    // 1. Initialization
+    #pragma omp parallel for schedule(static)
+    for (int i = 0; i < n; ++i) {
+        height[i] = n;
+    }
+    if (n > 0) { // Handle n=0 case
+        height[sink] = 0;
+    }
+
+    // 2. BFS Setup
+    std::vector<int> frontier;
+    if (n > 0) { // Avoid pushing sink if n=0
+        frontier.reserve(n / 4);
+        frontier.push_back(sink);
+    }
+
+    std::vector<int> next_frontier;
+    next_frontier.reserve(n / 4);
+
+    int current_level = 0;
+    int num_threads = 1;
+    #ifdef _OPENMP
+    num_threads = omp_get_max_threads();
+    #endif
+
+    std::vector<std::vector<int>> local_frontiers(num_threads);
+    for (int i = 0; i < num_threads; ++i) {
+        local_frontiers[i].reserve(n / 8);
+    }
+
+    // 3. BFS Loop
+    while (!frontier.empty()) {
+        for (auto& local_frontier : local_frontiers) {
+            local_frontier.clear();
+        }
+        next_frontier.clear();
+
+        #pragma omp parallel
+        {
+            int tid = 0;
+            #ifdef _OPENMP
+            tid = omp_get_thread_num();
+            #endif
+            auto& my_local_frontier = local_frontiers[tid];
+
+            #pragma omp for schedule(dynamic, 64) nowait // Add nowait if merge is thread-safe (it is)
+            for (size_t i = 0; i < frontier.size(); ++i) {
+                int v = frontier[i];
+                for (const auto& edge_from_v : graph[v]) {
+                    int u = edge_from_v.to;
+                    int rev_edge_idx = edge_from_v.rev;
+
+                    if (u < 0 || u >= n || rev_edge_idx < 0 || rev_edge_idx >= static_cast<int>(graph[u].size())) {
+                        continue;
+                    }
+
+                    const auto& edge_u_v = graph[u][rev_edge_idx];
+
+                    if (edge_u_v.capacity - edge_u_v.flow > 0) {
+                        bool updated = false;
+                        if (height[u] == n) {
+                            #pragma omp critical (UpdateHeightBFS) // Keep critical section for correctness
+                            {
+                                if (height[u] == n) { 
+                                    height[u] = current_level + 1;
+                                    updated = true;
+                                }
+                            }
+                        }
+                        if (updated) {
+                            my_local_frontier.push_back(u);
+                        }
+                    }
+                }
+            }
+        } // End parallel region
+
+        // Merge local frontiers
+        size_t total_size = 0;
+        for (const auto& local_frontier : local_frontiers) {
+            total_size += local_frontier.size();
+        }
+        if (total_size > next_frontier.capacity()) {
+             next_frontier.reserve(total_size); // Reserve only if needed
+        }
+
+        for (const auto& local_frontier : local_frontiers) {
+            next_frontier.insert(next_frontier.end(), local_frontier.begin(), local_frontier.end());
+        }
+
+        frontier.swap(next_frontier);
+        if (!frontier.empty()) { // Only increment level if there's a next frontier
+            current_level++;
+        }
+    }
+
+    // 4. Finalization
+    if (n > 0 && source != sink) {
+        height[source] = n;
+    }
 }
 
 // Debug print state (unchanged)

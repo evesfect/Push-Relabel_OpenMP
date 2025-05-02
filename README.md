@@ -1,6 +1,5 @@
 # Push-Relabel_OpenMP
 
-
 Design choices for the sequential Push-Relabel
 
 FIFO vs Highest Label
@@ -16,4 +15,3 @@ Design choices for the sequential Push-Relabel
 Global Relabeling with Backwards Parallel Breadth-First Search
 
 Batching with thread concurrent queue
-
