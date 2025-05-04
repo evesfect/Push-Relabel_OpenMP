@@ -1,4 +1,5 @@
 #include "parallel.h"
+#include "sequential.h"
 #include <limits>
 #include <algorithm>
 #include <iomanip>
@@ -376,109 +377,112 @@ void PushRelabelParallel::globalRelabel_timed(std::vector<std::vector<FlowNetwor
     #endif
 }
 
-// Global relabel via backward BFS (CLEAN VERSION - No Timers/Prints)
-void PushRelabelParallel::globalRelabel(std::vector<std::vector<FlowNetwork::Edge>>& graph, // Needs non-const graph
+// Global relabel via backward BFS (Hybrid: Sequential for small, Parallel for large)
+void PushRelabelParallel::globalRelabel(std::vector<std::vector<FlowNetwork::Edge>>& graph,
                                         std::vector<int>& height, int source, int sink, int n) {
 
-    // 1. Initialization
-    #pragma omp parallel for schedule(static)
-    for (int i = 0; i < n; ++i) {
-        height[i] = n;
-    }
-    if (n > 0) { // Handle n=0 case
-        height[sink] = 0;
-    }
+    // Define the threshold for switching between sequential and parallel
+    const int SEQUENTIAL_THRESHOLD_VERTICES = 1300;
 
-    // 2. BFS Setup
-    std::vector<int> frontier;
-    if (n > 0) { // Avoid pushing sink if n=0
-        frontier.reserve(n / 4);
-        frontier.push_back(sink);
-    }
-
-    std::vector<int> next_frontier;
-    next_frontier.reserve(n / 4);
-
-    int current_level = 0;
-    int num_threads = 1;
-    #ifdef _OPENMP
-    num_threads = omp_get_max_threads();
-    #endif
-
-    std::vector<std::vector<int>> local_frontiers(num_threads);
-    for (int i = 0; i < num_threads; ++i) {
-        local_frontiers[i].reserve(n / 8);
-    }
-
-    // 3. BFS Loop
-    while (!frontier.empty()) {
-        for (auto& local_frontier : local_frontiers) {
-            local_frontier.clear();
+    if (n < SEQUENTIAL_THRESHOLD_VERTICES) {
+        // Use the sequential version for small graphs
+        PushRelabelSequential::globalRelabel(graph, height, source, sink, n);
+        // Optional: Add a print statement here for debugging to see when sequential is used
+        // std::cout << "(Using sequential global relabel for n=" << n << ")" << std::endl;
+    } else {
+        // Use the parallel version for large graphs
+        // (Parallel implementation from the previous step goes here)
+        // 1. Initialization
+        #pragma omp parallel for schedule(static)
+        for (int i = 0; i < n; ++i) {
+            height[i] = n;
         }
-        next_frontier.clear();
+        if (n > 0) { height[sink] = 0; }
 
-        #pragma omp parallel
-        {
-            int tid = 0;
-            #ifdef _OPENMP
-            tid = omp_get_thread_num();
-            #endif
-            auto& my_local_frontier = local_frontiers[tid];
+        // 2. BFS Setup
+        std::vector<int> frontier;
+        if (n > 0) {
+            frontier.reserve(n / 4);
+            frontier.push_back(sink);
+        }
+        std::vector<int> next_frontier;
+        next_frontier.reserve(n / 4);
+        int current_level = 0;
+        int num_threads = 1;
+        #ifdef _OPENMP
+        num_threads = omp_get_max_threads();
+        #endif
+        std::vector<std::vector<int>> local_frontiers(num_threads);
+        for (int i = 0; i < num_threads; ++i) {
+            local_frontiers[i].reserve(n / 8);
+        }
 
-            #pragma omp for schedule(dynamic, 64) nowait // Add nowait if merge is thread-safe (it is)
-            for (size_t i = 0; i < frontier.size(); ++i) {
-                int v = frontier[i];
-                for (const auto& edge_from_v : graph[v]) {
-                    int u = edge_from_v.to;
-                    int rev_edge_idx = edge_from_v.rev;
+        // 3. BFS Loop
+        while (!frontier.empty()) {
+            for (auto& local_frontier : local_frontiers) {
+                local_frontier.clear();
+            }
+            next_frontier.clear();
 
-                    if (u < 0 || u >= n || rev_edge_idx < 0 || rev_edge_idx >= static_cast<int>(graph[u].size())) {
-                        continue;
-                    }
+            #pragma omp parallel
+            {
+                int tid = 0;
+                #ifdef _OPENMP
+                tid = omp_get_thread_num();
+                #endif
+                auto& my_local_frontier = local_frontiers[tid];
 
-                    const auto& edge_u_v = graph[u][rev_edge_idx];
-
-                    if (edge_u_v.capacity - edge_u_v.flow > 0) {
-                        bool updated = false;
-                        if (height[u] == n) {
-                            #pragma omp critical (UpdateHeightBFS) // Keep critical section for correctness
-                            {
-                                if (height[u] == n) { 
-                                    height[u] = current_level + 1;
-                                    updated = true;
+                #pragma omp for schedule(dynamic, 64) nowait
+                for (size_t i = 0; i < frontier.size(); ++i) {
+                    int v = frontier[i];
+                    for (const auto& edge_from_v : graph[v]) {
+                        int u = edge_from_v.to;
+                        int rev_edge_idx = edge_from_v.rev;
+                        if (u < 0 || u >= n || rev_edge_idx < 0 || rev_edge_idx >= static_cast<int>(graph[u].size())) {
+                            continue;
+                        }
+                        const auto& edge_u_v = graph[u][rev_edge_idx];
+                        if (edge_u_v.capacity - edge_u_v.flow > 0) {
+                            bool updated = false;
+                            if (height[u] == n) {
+                                #pragma omp critical (UpdateHeightBFS)
+                                {
+                                    if (height[u] == n) {
+                                        height[u] = current_level + 1;
+                                        updated = true;
+                                    }
                                 }
                             }
-                        }
-                        if (updated) {
-                            my_local_frontier.push_back(u);
+                            if (updated) {
+                                my_local_frontier.push_back(u);
+                            }
                         }
                     }
                 }
+            } // End parallel region
+
+            // Merge local frontiers
+            size_t total_size = 0;
+            for (const auto& local_frontier : local_frontiers) {
+                total_size += local_frontier.size();
             }
-        } // End parallel region
+            if (total_size > next_frontier.capacity()) {
+                next_frontier.reserve(total_size);
+            }
+            for (const auto& local_frontier : local_frontiers) {
+                next_frontier.insert(next_frontier.end(), local_frontier.begin(), local_frontier.end());
+            }
 
-        // Merge local frontiers
-        size_t total_size = 0;
-        for (const auto& local_frontier : local_frontiers) {
-            total_size += local_frontier.size();
-        }
-        if (total_size > next_frontier.capacity()) {
-             next_frontier.reserve(total_size); // Reserve only if needed
-        }
-
-        for (const auto& local_frontier : local_frontiers) {
-            next_frontier.insert(next_frontier.end(), local_frontier.begin(), local_frontier.end());
+            frontier.swap(next_frontier);
+            if (!frontier.empty()) {
+                current_level++;
+            }
         }
 
-        frontier.swap(next_frontier);
-        if (!frontier.empty()) { // Only increment level if there's a next frontier
-            current_level++;
+        // 4. Finalization
+        if (n > 0 && source != sink) {
+            height[source] = n;
         }
-    }
-
-    // 4. Finalization
-    if (n > 0 && source != sink) {
-        height[source] = n;
     }
 }
 

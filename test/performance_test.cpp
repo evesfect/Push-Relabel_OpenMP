@@ -98,19 +98,19 @@ int main(int argc, char* argv[]) {
     if (argc > 3) numThreads = std::stoi(argv[3]);
     
     // Test small, medium and large graphs
-    std::vector<int> graphSizes = {500, 1000, 5000};
-    std::vector<double> densities = {0.01, 0.1, 0.3};
+    std::vector<int> graphSizes = {1000, 5000, 10000};
+    std::vector<double> densities = {0.01, 0.1, 0.3, 0.5};
     
     // Test isolated global relabeling performance
-    /*
+    
     for (int size : graphSizes) {
         for (double dens : densities) {
             testGlobalRelabelingPerformance(size, dens);
         }
-    }*/
     
+    }
     // Test full max-flow algorithm performance
-    testMaxFlowPerformance(numVertices, density, numThreads);
+    //testMaxFlowPerformance(numVertices, density, numThreads);
     
     return 0;
 }
