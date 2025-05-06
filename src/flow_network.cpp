@@ -30,7 +30,7 @@ void FlowNetwork::print() const {
     std::cout << "Flow Network with " << num_vertices << " vertices:" << std::endl;
     for (int from = 0; from < num_vertices; ++from) {
         for (const auto& edge : graph[from]) {
-            if (edge.capacity > 0) { // Only print forward edges, not residual
+            if (edge.capacity > 0) { //Don't print residuals
                 std::cout << from << " -> " << edge.to << ": capacity = " 
                           << edge.capacity << ", flow = " << edge.flow << std::endl;
             }

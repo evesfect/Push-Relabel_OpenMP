@@ -23,7 +23,6 @@ public:
     int getNumVertices() const;
     const std::vector<std::vector<Edge>>& getGraph() const;
 
-    // For debug/testing/report
     void print() const;
     bool saveToFile(const std::string& filename) const;
     static FlowNetwork loadFromFile(const std::string& filename);
