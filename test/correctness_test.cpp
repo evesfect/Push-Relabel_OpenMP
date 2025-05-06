@@ -12,7 +12,6 @@ void testTinyGraph() {
     // Create a very small flow network manually
     FlowNetwork network(4);
     
-    // Add edges (source=0, sink=3)
     network.addEdge(0, 1, 3);
     network.addEdge(0, 2, 2);
     network.addEdge(1, 2, 1);

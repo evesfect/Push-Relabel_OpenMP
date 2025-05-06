@@ -1,17 +1,10 @@
 # Push-Relabel_OpenMP
 
-Design choices for the sequential Push-Relabel
+Requires boost library installed.
+Adjust boost directory in MakeFile.
 
-FIFO vs Highest Label
+make parallel (for main program) (can be used to save graphs but not necessary)
+make benchmark-parallel (for performance_test executable, use this to test time or compare versions)
+make test (correctness test)
 
-Time Complexity
-    FIFO: O(V^3), HL: O((V^2)E^(1/2))
-
-Vertex Selection Data Structure
-    FIFO: Queue O(1) access, HL: Priority Queue O(log n) access / Bucket
-
-Design choices for the sequential Push-Relabel
-
-Global Relabeling with Backwards Parallel Breadth-First Search
-
-Batching with thread concurrent queue
+make sequential, etc are not supported. Use the above commands.
