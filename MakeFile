@@ -9,7 +9,7 @@ SRC_DIR = src
 BIN_DIR = bin
 TEST_DIR = test
 
-# Boost settings - adjust paths as needed
+# Boost settings
 ifdef BOOST_ROOT
   BOOST_INC = -I$(BOOST_ROOT)
 else

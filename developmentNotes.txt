@@ -1,2 +1,12 @@
-Parallel version without any OpenMP flags, x0.85 speedup
+Parallel version without any OpenMP flags (single thread- same code), x0.85 speed
+x0.7 speedup (slowdown) with Baumstark phased approach compared to FIFO event though parallelized!
+Baumstark paper heavily relies on efficient Global Heuristics and the rest seems inferior.
+Starting from again: Adding Global Relabeling to seq FIFO.
 x45 speedup with Global Heuristics compared to default FIFO (sequential testing)
+Global Relabeling parallel almost x200 speedup compared to standard FIFO
+Gap Relabeling seems too complicated. Only Global Relabel for sequential final version. Maybe gap if there is time left?
+Problems with push relabel parallelization, too much atomic/contention?
+Profiling results: push takes majority time, cannot get correct results when parallelized. Start again.
+Simple parallelization with atomic discharge. Also used critical section for actives. Good Speedup but only at large graphs.
+Testing takes too much time, correct push relabel parallel versions asap and write report!
+Add final test comparing all versions FIFO, FIFO(GR), Parallel(GR), Parallel(Active) 

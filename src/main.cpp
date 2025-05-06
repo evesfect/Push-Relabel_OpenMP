@@ -8,14 +8,7 @@
 #include "parallel.h"
 
 void printUsage(const std::string& program_name) {
-    std::cout << "Usage: " << program_name << " [options]" << std::endl;
-    std::cout << "Options:" << std::endl;
-    std::cout << "  -g/--generate <vertices> <edge_prob> <min_cap> <max_cap> <filename>" << std::endl;
-    std::cout << "    Generate a random flow network and save it to file" << std::endl;
-    std::cout << "  -t/--test <filename> <source> <sink>" << std::endl;
-    std::cout << "    Test the max flow algorithm on the given network" << std::endl;
-    std::cout << "  -b/--benchmark <filename> <source> <sink> [runs=5]" << std::endl;
-    std::cout << "    Benchmark sequential vs parallel implementation" << std::endl;
+    std::cout << "Error: Check possible usage and commands" << std::endl;
 }
 
 int main(int argc, char* argv[]) {
@@ -63,7 +56,6 @@ int main(int argc, char* argv[]) {
 
             FlowNetwork network = FlowNetwork::loadFromFile(filename);
             
-            // Calculate expected flow using Boost
             int expected_flow = MaxFlowTester::computeExpectedFlow(network, source, sink);
             std::cout << "Expected max flow: " << expected_flow << std::endl;
             

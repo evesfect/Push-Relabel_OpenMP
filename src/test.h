@@ -7,22 +7,17 @@
 #include <chrono>
 #include <iostream>
 
-// Forward declarations
-class PushRelabelSequential; // Will be implemented later
-class PushRelabelParallel;   // Will be implemented later
+class PushRelabelSequential;
+class PushRelabelParallel;
 
 class MaxFlowTester {
 public:
-    // Compare results with Boost
     static bool verifyCorrectness(const FlowNetwork& network, int source, int sink, int computed_flow);
     
-    // Compute max flow using Boost
     static int computeExpectedFlow(const FlowNetwork& network, int source, int sink);
     
-    // Compare sequential and parallel implementations
     static bool compareImplementations(const FlowNetwork& network, int source, int sink);
 
-    // Run benchmarks, print results
     static void runBenchmark(const std::vector<FlowNetwork>& networks, 
                             int source, int sink,
                             int num_runs = 5);
@@ -59,7 +54,6 @@ public:
         startTime = std::chrono::high_resolution_clock::now();
     }
 
-    // Returns elapsed time in milliseconds without stopping/printing
     double elapsed() const {
         auto now = std::chrono::high_resolution_clock::now();
         return std::chrono::duration<double, std::milli>(now - startTime).count();
