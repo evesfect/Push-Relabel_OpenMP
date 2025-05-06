@@ -1,5 +1,3 @@
-#ifndef SEQUENTIAL_H
-#define SEQUENTIAL_H
 
 #include "flow_network.h"
 #include <queue>
@@ -78,5 +76,3 @@ private:
                           const std::vector<int>& excess, const std::vector<int>& height,
                           const std::queue<int>& active_vertices, int n);
 };
-
-#endif

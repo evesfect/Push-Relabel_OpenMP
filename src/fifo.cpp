@@ -1,4 +1,4 @@
-#include "FIFO.h"
+#include "fifo.h"
 #include <limits>
 #include <algorithm>
 #include <iomanip>

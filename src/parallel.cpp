@@ -4,8 +4,8 @@
 #include <algorithm>
 #include <iomanip>
 #include <vector>
-#include <atomic> // Include for atomic operations
-#include <numeric> // For std::iota
+#include <atomic>
+#include <numeric>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -43,14 +43,12 @@ int PushRelabelParallel::maxFlow(FlowNetwork& network, int source, int sink, int
     std::queue<int> active_vertices;
     std::vector<bool> in_queue(n, false);
 
-    // Global relabel frequency setup
     int relabel_since_last = 0;
     const int global_freq = n;
     int total_global = 0;
 
     initialize(graph, excess, height, active_vertices, in_queue, source, sink, n);
 
-    // Initial global relabel
     globalRelabel(graph, height, source, sink, n);
     total_global++;
     active_vertices = {};
@@ -65,7 +63,6 @@ int PushRelabelParallel::maxFlow(FlowNetwork& network, int source, int sink, int
     int iterations = 0, total_relabels = 0;
     while (!active_vertices.empty() && iterations < MAX_ITERATIONS) {
         if (relabel_since_last >= global_freq) {
-            // Global relabel
             globalRelabel(graph, height, source, sink, n);
             total_global++;
             relabel_since_last = 0;
@@ -110,7 +107,6 @@ int PushRelabelParallel::maxFlow(FlowNetwork& network, int source, int sink, int
     return max_flow;
 }
 
-// Initialize preflow
 void PushRelabelParallel::initialize(const std::vector<std::vector<FlowNetwork::Edge>>& graph,
                                      std::vector<int>& excess, std::vector<int>& height,
                                      std::queue<int>& active_vertices, std::vector<bool>& in_queue,
@@ -137,7 +133,6 @@ void PushRelabelParallel::initialize(const std::vector<std::vector<FlowNetwork::
     }
 }
 
-// Push operation (single edge)
 bool PushRelabelParallel::push(std::vector<std::vector<FlowNetwork::Edge>>& graph,
                                std::vector<int>& excess, std::vector<int>& height,
                                std::queue<int>& active_vertices, std::vector<bool>& in_queue,
@@ -159,7 +154,6 @@ bool PushRelabelParallel::push(std::vector<std::vector<FlowNetwork::Edge>>& grap
     return true;
 }
 
-// Relabel node u
 bool PushRelabelParallel::relabel(const std::vector<std::vector<FlowNetwork::Edge>>& graph,
                                   std::vector<int>& height, int u, int n) {
     int min_h = INF_HEIGHT;
@@ -171,7 +165,6 @@ bool PushRelabelParallel::relabel(const std::vector<std::vector<FlowNetwork::Edg
     return true;
 }
 
-// Discharge excess at u
 int PushRelabelParallel::discharge(std::vector<std::vector<FlowNetwork::Edge>>& graph,
                                    std::vector<int>& excess, std::vector<int>& height,
                                    std::queue<int>& active_vertices, std::vector<bool>& in_queue,
@@ -192,22 +185,19 @@ int PushRelabelParallel::discharge(std::vector<std::vector<FlowNetwork::Edge>>& 
     return relabels;
 }
 
-// Global relabel via backward BFS (TIMED VERSION)
+// Global relabel via backward BFS version 2 (TIMED VERSION) (lots of overhead!)
 void PushRelabelParallel::globalRelabel_timed(std::vector<std::vector<FlowNetwork::Edge>>& graph, // Needs non-const graph
                                               std::vector<int>& height, int source, int sink, int n) {
-    // Start overall timing
     double start_time_total = 0.0;
     #ifdef _OPENMP
     start_time_total = omp_get_wtime();
     #endif
 
-    // 1. Initialization timing
     double start_time_init = 0.0;
     #ifdef _OPENMP
     start_time_init = omp_get_wtime();
     #endif
 
-    // Initialize heights array
     #pragma omp parallel for schedule(static)
     for (int i = 0; i < n; ++i) {
         height[i] = n;
@@ -219,15 +209,13 @@ void PushRelabelParallel::globalRelabel_timed(std::vector<std::vector<FlowNetwor
     end_time_init = omp_get_wtime();
     #endif
 
-    // 2. BFS Setup timing
     double start_time_setup = 0.0;
     #ifdef _OPENMP
     start_time_setup = omp_get_wtime();
     #endif
 
-    // Use vector for frontier (better cache locality than queue)
     std::vector<int> frontier;
-    frontier.reserve(n/4); // Reserve reasonable space but not too much
+    frontier.reserve(n/4);
     frontier.push_back(sink);
 
     std::vector<int> next_frontier;
@@ -239,7 +227,6 @@ void PushRelabelParallel::globalRelabel_timed(std::vector<std::vector<FlowNetwor
     num_threads = omp_get_max_threads();
     #endif
 
-    // Thread-local frontiers - preallocate once and reuse
     std::vector<std::vector<int>> local_frontiers(num_threads);
     for (int i = 0; i < num_threads; ++i) {
         local_frontiers[i].reserve(n/8); // Reserve space but avoid excessive allocation
@@ -250,22 +237,18 @@ void PushRelabelParallel::globalRelabel_timed(std::vector<std::vector<FlowNetwor
     end_time_setup = omp_get_wtime();
     #endif
 
-    // 3. BFS Loop timing
     double start_time_bfs = 0.0;
     double total_time_merge = 0.0;
     #ifdef _OPENMP
     start_time_bfs = omp_get_wtime();
     #endif
 
-    // Main BFS loop
     while (!frontier.empty()) {
-        // Clear all local frontiers at once
         for (auto& local_frontier : local_frontiers) {
             local_frontier.clear();
         }
         next_frontier.clear();
 
-        // Process current level in parallel
         #pragma omp parallel
         {
             int tid = 0;
@@ -274,7 +257,6 @@ void PushRelabelParallel::globalRelabel_timed(std::vector<std::vector<FlowNetwor
             #endif
             auto& my_local_frontier = local_frontiers[tid];
 
-            // Parallel processing of frontier nodes
             #pragma omp for schedule(dynamic, 64)
             for (size_t i = 0; i < frontier.size(); ++i) {
                 int v = frontier[i];
@@ -294,13 +276,10 @@ void PushRelabelParallel::globalRelabel_timed(std::vector<std::vector<FlowNetwor
 
                     // Check if there's residual capacity from u to v
                     if (edge_u_v.capacity - edge_u_v.flow > 0) {
-                        // Try to update height of u using a critical section
                         bool updated = false;
-                        // Fast check outside critical section to reduce contention
                         if (height[u] == n) { 
                             #pragma omp critical (UpdateHeightBFS)
                             {
-                                // Double-check inside critical section
                                 if (height[u] == n) { 
                                     height[u] = current_level + 1;
                                     updated = true;
@@ -313,7 +292,7 @@ void PushRelabelParallel::globalRelabel_timed(std::vector<std::vector<FlowNetwor
                     }
                 }
             }
-        } // End parallel region
+        }
 
         // Merge timing
         double start_time_merge = 0.0;
@@ -321,7 +300,7 @@ void PushRelabelParallel::globalRelabel_timed(std::vector<std::vector<FlowNetwor
         start_time_merge = omp_get_wtime();
         #endif
 
-        // Efficient merge of local frontiers
+        // Merge local frontiers
         size_t total_size = 0;
         for (const auto& local_frontier : local_frontiers) {
             total_size += local_frontier.size();
@@ -348,7 +327,6 @@ void PushRelabelParallel::globalRelabel_timed(std::vector<std::vector<FlowNetwor
     end_time_bfs = omp_get_wtime();
     #endif
 
-    // 4. Finalization timing
     double start_time_finalize = 0.0;
     #ifdef _OPENMP
     start_time_finalize = omp_get_wtime();
@@ -366,42 +344,34 @@ void PushRelabelParallel::globalRelabel_timed(std::vector<std::vector<FlowNetwor
     end_time_total = omp_get_wtime();
     #endif
 
-    // Print timing results
+
     #ifdef _OPENMP
     std::cout << "Global Relabel Timings:" << std::endl
               << "  - Initialization: " << (end_time_init - start_time_init) * 1000 << " ms" << std::endl
               << "  - Setup:         " << (end_time_setup - start_time_setup) * 1000 << " ms" << std::endl
               << "  - BFS Loop:      " << (end_time_bfs - start_time_bfs) * 1000 << " ms" << std::endl
-              << "    - Merge Time:  " << total_time_merge * 1000 << " ms" << std::endl
+              << "  - Merge Time:  " << total_time_merge * 1000 << " ms" << std::endl
               << "  - Finalization:  " << (end_time_finalize - start_time_finalize) * 1000 << " ms" << std::endl
               << "  - Total Time:    " << (end_time_total - start_time_total) * 1000 << " ms" << std::endl
               << "  - Levels:        " << current_level << std::endl;
     #endif
 }
 
-// Global relabel via backward BFS (Hybrid: Sequential for small, Parallel for large)
+// Global relabel Hybrid
 void PushRelabelParallel::globalRelabel(std::vector<std::vector<FlowNetwork::Edge>>& graph,
                                         std::vector<int>& height, int source, int sink, int n) {
 
-    // Define the threshold for switching between sequential and parallel
     const int SEQUENTIAL_THRESHOLD_VERTICES = 1300;
 
     if (n < SEQUENTIAL_THRESHOLD_VERTICES) {
-        // Use the sequential version for small graphs
         PushRelabelSequential::globalRelabel(graph, height, source, sink, n);
-        // Optional: Add a print statement here for debugging to see when sequential is used
-        // std::cout << "(Using sequential global relabel for n=" << n << ")" << std::endl;
     } else {
-        // Use the parallel version for large graphs
-        // (Parallel implementation from the previous step goes here)
-        // 1. Initialization
         #pragma omp parallel for schedule(static)
         for (int i = 0; i < n; ++i) {
             height[i] = n;
         }
         if (n > 0) { height[sink] = 0; }
 
-        // 2. BFS Setup
         std::vector<int> frontier;
         if (n > 0) {
             frontier.reserve(n / 4);
@@ -419,7 +389,6 @@ void PushRelabelParallel::globalRelabel(std::vector<std::vector<FlowNetwork::Edg
             local_frontiers[i].reserve(n / 8);
         }
 
-        // 3. BFS Loop
         while (!frontier.empty()) {
             for (auto& local_frontier : local_frontiers) {
                 local_frontier.clear();
@@ -461,7 +430,7 @@ void PushRelabelParallel::globalRelabel(std::vector<std::vector<FlowNetwork::Edg
                         }
                     }
                 }
-            } // End parallel region
+            }
 
             // Merge local frontiers
             size_t total_size = 0;
@@ -481,14 +450,12 @@ void PushRelabelParallel::globalRelabel(std::vector<std::vector<FlowNetwork::Edg
             }
         }
 
-        // 4. Finalization
         if (n > 0 && source != sink) {
             height[source] = n;
         }
     }
 }
 
-// Debug print state (unchanged)
 void PushRelabelParallel::printState(const std::vector<std::vector<FlowNetwork::Edge>>& graph,
                                      const std::vector<int>& excess, const std::vector<int>& height,
                                      const std::queue<int>& active_vertices, int n) {
@@ -510,8 +477,7 @@ void PushRelabelParallel::printState(const std::vector<std::vector<FlowNetwork::
     std::cout << "---------------------" << std::endl;
 }
 
-// Discharge excess at u using atomic operations
-// Collects newly active nodes locally instead of modifying global queue
+
 int PushRelabelParallel::discharge_Atomic(std::vector<std::vector<FlowNetwork::Edge>>& graph,
                                           std::vector<std::atomic<int>>& atomic_excess,
                                           std::vector<int>& height,
@@ -528,81 +494,65 @@ int PushRelabelParallel::discharge_Atomic(std::vector<std::vector<FlowNetwork::E
             auto& e = graph[u][i];
             int v = e.to;
 
-            // Check if push is possible (capacity and height condition)
+            // Check if push is possible
             if (e.capacity - e.flow > 0 && height[u] == height[v] + 1) {
                 auto& rev = graph[v][e.rev];
                 int delta = std::min(current_excess, e.capacity - e.flow);
 
                 if (delta > 0) {
-                    // Atomically update flows and excesses
-                    // Note: Updating edge flows requires atomicity.
-                    // Using #pragma omp atomic is generally safer for struct members
-                    // unless FlowNetwork::Edge::flow itself is std::atomic<int>.
-                    // Assuming Edge::flow is int for now.
-
-                    // Tentatively decrease excess[u]
                     int expected_u = current_excess;
                     while (expected_u > 0 && !atomic_excess[u].compare_exchange_weak(expected_u, expected_u - delta)) {
-                         // Spin-wait or recalculate delta based on new expected_u if needed
                          delta = std::min(expected_u, e.capacity - e.flow);
-                         if (delta <= 0) break; // Cannot push anymore if excess becomes 0 or capacity constraint changes
+                         if (delta <= 0) break; // If excess becomes 0 or capacity constraint changes
                     }
 
-                    if (delta > 0 && expected_u > 0) { // Check if compare_exchange succeeded and delta is still valid
+                    if (delta > 0 && expected_u > 0) { // If compare_exchange succeeded and delta 
                         #pragma omp atomic update
                         e.flow += delta;
                         #pragma omp atomic update
                         rev.flow -= delta;
 
-                        // Atomically increase excess[v]
                         atomic_excess[v].fetch_add(delta, std::memory_order_relaxed);
 
                         did_push = true;
                         current_excess -= delta; // Update local view of excess
 
-                        // If v becomes active and is not source/sink, add to local list
+                        // If v becomes active and is not source/sink, then add to local list
                         if (v != source && v != sink && atomic_excess[v].load(std::memory_order_relaxed) > 0) {
-                             // Note: We don't check in_queue here, that happens during the merge phase
                              local_newly_active.push_back(v);
                         }
                     } else {
-                        // Failed to decrease excess[u], maybe another thread pushed first?
-                        // Reload current_excess to retry the loop or edge.
+                        // Failed 
                         current_excess = atomic_excess[u].load(std::memory_order_relaxed);
-                        did_push = false; // Indicate push didn't fully complete for this edge attempt
-                        break; // Break from inner loop to re-evaluate conditions
+                        did_push = false;
+                        break; // re-evaluaete
                     }
                 }
             }
-             // Reload excess if needed, especially if compare_exchange failed
+             // Reload excess if needed, especially if failed
             if (!did_push) current_excess = atomic_excess[u].load(std::memory_order_relaxed);
-        } // End edge loop
+        }
 
         if (!did_push && current_excess > 0) {
-            // Relabel if no push occurred but excess remains
-            if (relabel(graph, height, u, n)) { // Assuming relabel itself is thread-safe w.r.t. height[u]
+            // Relabel if no push but excess remains
+            if (relabel(graph, height, u, n)) {
                 relabels++;
-                // No need to update current_excess after relabel, loop condition checks height[u]
             } else {
-                // If relabel somehow fails or indicates no useful change
                 break;
             }
         }
-         // Update local excess view for the while loop condition
         current_excess = atomic_excess[u].load(std::memory_order_relaxed);
 
-    } // End while excess[u] > 0
+    }
 
     return relabels;
 }
 
-// New maxFlow variant with parallel processing of active nodes
 int PushRelabelParallel::maxFlow_ActiveParallel(FlowNetwork& network, int source, int sink, int num_threads) {
      int n = network.getNumVertices();
     std::cout << "Starting Parallel Push-Relabel (ActiveParallel) with " << n
               << " vertices (source=" << source << ", sink=" << sink << ")" << std::endl;
 
-    // Thread setup
     #ifdef _OPENMP
     if (num_threads <= 0) {
         num_threads = omp_get_max_threads();
@@ -620,34 +570,28 @@ int PushRelabelParallel::maxFlow_ActiveParallel(FlowNetwork& network, int source
 
     auto& graph = const_cast<std::vector<std::vector<FlowNetwork::Edge>>&>(network.getGraph());
 
-    // Use std::atomic<int> for excess
     std::vector<int> initial_excess(n, 0);
     std::vector<int> height(n, 0);
-    std::queue<int> active_vertices_queue; // Use queue for managing active set
-    std::vector<bool> in_queue(n, false); // Track nodes in the queue
+    std::queue<int> active_vertices_queue;
+    std::vector<bool> in_queue(n, false);
 
-    // Initialize using standard excess vector first
     initialize(graph, initial_excess, height, active_vertices_queue, in_queue, source, sink, n);
 
-    // Convert initial excess to atomic excess
     std::vector<std::atomic<int>> atomic_excess(n);
     for (int i = 0; i < n; ++i) {
         atomic_excess[i].store(initial_excess[i], std::memory_order_relaxed);
     }
-    initial_excess.clear(); // Free memory
+    initial_excess.clear();
 
 
-    // Global relabel frequency setup
     int relabel_since_last = 0;
     const int global_freq = n;
     int total_global = 0;
 
-    // Initial global relabel
     globalRelabel(graph, height, source, sink, n);
     total_global++;
 
-    // Rebuild active queue after global relabel
-    active_vertices_queue = {}; // Clear queue
+    active_vertices_queue = {};
     std::fill(in_queue.begin(), in_queue.end(), false);
     for (int i = 0; i < n; ++i) {
         if (i != source && i != sink && atomic_excess[i].load(std::memory_order_relaxed) > 0 && height[i] < n) {
@@ -657,19 +601,17 @@ int PushRelabelParallel::maxFlow_ActiveParallel(FlowNetwork& network, int source
     }
 
     int iterations = 0, total_local_relabels = 0;
-    std::vector<int> current_active_batch; // Vector to hold nodes for parallel processing
-    std::vector<std::vector<int>> thread_local_newly_active(num_threads); // Per-thread storage
+    std::vector<int> current_active_batch;
+    std::vector<std::vector<int>> thread_local_newly_active(num_threads);
 
 
     while (!active_vertices_queue.empty() && iterations < MAX_ITERATIONS) {
         if (relabel_since_last >= global_freq) {
-            // Global relabel
             globalRelabel(graph, height, source, sink, n);
             total_global++;
             relabel_since_last = 0;
 
-            // Rebuild active queue after global relabel
-            active_vertices_queue = {}; // Clear queue
+            active_vertices_queue = {};
             std::fill(in_queue.begin(), in_queue.end(), false);
             for (int i = 0; i < n; ++i) {
                  if (i != source && i != sink && atomic_excess[i].load(std::memory_order_relaxed) > 0 && height[i] < n) {
@@ -677,47 +619,42 @@ int PushRelabelParallel::maxFlow_ActiveParallel(FlowNetwork& network, int source
                     in_queue[i] = true;
                 }
             }
-            if (active_vertices_queue.empty()) break; // Exit if no active nodes after relabel
+            if (active_vertices_queue.empty()) break;
         }
 
-        // Prepare batch for parallel processing
+        // Prepare batch
         current_active_batch.clear();
         while (!active_vertices_queue.empty()) {
             current_active_batch.push_back(active_vertices_queue.front());
             active_vertices_queue.pop();
-            // Note: in_queue remains true for nodes in the batch
         }
 
-        if (current_active_batch.empty()) continue; // Should not happen if queue wasn't empty, but safety check
+        if (current_active_batch.empty()) continue; // safety check
 
 
-        // Parallel discharge phase
-        int batch_relabels = 0; // Sum of relabels in this batch
+        // Parallel discharge
+        int batch_relabels = 0;
 
-        #pragma omp parallel num_threads(num_threads) reduction(+:batch_relabels)
+        #pragma omp parallel num_threads(num_threads) reduction(+:batch_relabels) // Not: Combines values of each thread*
         {
             int tid = omp_get_thread_num();
-            thread_local_newly_active[tid].clear(); // Clear local storage for this batch
+            thread_local_newly_active[tid].clear();
 
-            #pragma omp for schedule(dynamic, 64) // Dynamic schedule for potentially uneven work
+            #pragma omp for schedule(dynamic, 64)
             for (size_t i = 0; i < current_active_batch.size(); ++i) {
                 int u = current_active_batch[i];
-                // Only discharge if the node still has excess (might have been drained by another thread)
                 if (atomic_excess[u].load(std::memory_order_relaxed) > 0 && height[u] < n) {
                      batch_relabels += discharge_Atomic(graph, atomic_excess, height,
                                                      thread_local_newly_active[tid],
                                                      u, source, sink, n);
                 }
-                // Mark u as processed (no longer in the conceptual 'active set' for this iteration)
-                // We will re-add if it still has excess later.
-                // The in_queue status will be updated during merge.
-                 #pragma omp critical (UpdateInQueue) // Protect access to shared in_queue
-                 {
-                    in_queue[u] = false;
-                 }
+                #pragma omp critical (UpdateInQueue) // Protect access to shared in_queue
+                {
+                in_queue[u] = false;
+                }
 
-            } // End parallel for
-        } // End parallel region
+            }
+        }
 
         total_local_relabels += batch_relabels;
         relabel_since_last += batch_relabels;
@@ -725,30 +662,21 @@ int PushRelabelParallel::maxFlow_ActiveParallel(FlowNetwork& network, int source
         // Merge thread-local newly active nodes into the global queue
         for (int tid = 0; tid < num_threads; ++tid) {
             for (int v : thread_local_newly_active[tid]) {
-                // Check if the node v *actually* needs to be activated:
-                // - Must not already be in the queue
-                // - Must still have positive excess (could have been drained)
-                // - Must have a valid height
                 if (!in_queue[v] && atomic_excess[v].load(std::memory_order_relaxed) > 0 && height[v] < n) {
                      active_vertices_queue.push(v);
                     in_queue[v] = true;
                 }
             }
         }
-
-         // Add back nodes from the processed batch if they STILL have excess and weren't re-added
-         // This handles cases where a node was relabeled but still has excess,
-         // or where discharge didn't fully drain it before the loop ended.
-         for (int u : current_active_batch) {
-              if (!in_queue[u] && atomic_excess[u].load(std::memory_order_relaxed) > 0 && height[u] < n) {
-                    active_vertices_queue.push(u);
-                    in_queue[u] = true;
-              }
-         }
-
+        for (int u : current_active_batch) {
+            if (!in_queue[u] && atomic_excess[u].load(std::memory_order_relaxed) > 0 && height[u] < n) {
+                active_vertices_queue.push(u);
+                in_queue[u] = true;
+            }
+        }
 
         iterations++;
-    } // End while active_vertices_queue not empty
+    }
 
     if (iterations >= MAX_ITERATIONS) {
         std::cout << "WARNING: Reached maximum iterations. Max flow might be incorrect." << std::endl;
@@ -761,7 +689,6 @@ int PushRelabelParallel::maxFlow_ActiveParallel(FlowNetwork& network, int source
     return max_flow;
 }
 
-// Overload printState for atomic excess (if needed for debugging)
 void PushRelabelParallel::printState(const std::vector<std::vector<FlowNetwork::Edge>>& graph,
                                      const std::vector<std::atomic<int>>& atomic_excess,
                                      const std::vector<int>& height,
@@ -774,7 +701,7 @@ void PushRelabelParallel::printState(const std::vector<std::vector<FlowNetwork::
     std::cout << std::endl;
     if (!atomic_excess.empty()) {
         std::cout << "  Excess:  ";
-        for (int i = 0; i < n; i++) std::cout << atomic_excess[i].load() << " "; // Load atomic value
+        for (int i = 0; i < n; i++) std::cout << atomic_excess[i].load() << " ";
         std::cout << std::endl;
     }
     std::cout << "  Active Queue (" << active_vertices.size() << "): ";
