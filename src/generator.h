@@ -13,12 +13,6 @@ public:
                              int min_capacity, int max_capacity, 
                              int source = 0, int sink = -1);
 
-    FlowNetwork generateLayered(int num_layers, int vertices_per_layer,
-                              double edge_probability,
-                              int min_capacity, int max_capacity);
-                              
-    FlowNetwork generateDense(int num_vertices, int min_capacity, int max_capacity,
-                            int source = 0, int sink = -1);
 
 private:
     std::mt19937 rng;
