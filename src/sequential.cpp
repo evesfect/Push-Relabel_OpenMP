@@ -20,14 +20,12 @@ int PushRelabelSequential::maxFlow(FlowNetwork& network, int source, int sink) {
     std::queue<int> active_vertices;
     std::vector<bool> in_queue(n, false);
 
-    // Global relabel frequency setup
     int relabel_since_last = 0;
     const int global_freq = n;
     int total_global = 0;
 
     initialize(graph, excess, height, active_vertices, in_queue, source, sink, n);
 
-    // Initial global relabel
     globalRelabel(graph, height, source, sink, n);
     total_global++;
     active_vertices = {};
@@ -42,7 +40,6 @@ int PushRelabelSequential::maxFlow(FlowNetwork& network, int source, int sink) {
     int iterations = 0, total_relabels = 0;
     while (!active_vertices.empty() && iterations < MAX_ITERATIONS) {
         if (relabel_since_last >= global_freq) {
-            // Global relabel
             globalRelabel(graph, height, source, sink, n);
             total_global++;
             relabel_since_last = 0;
@@ -87,7 +84,6 @@ int PushRelabelSequential::maxFlow(FlowNetwork& network, int source, int sink) {
     return max_flow;
 }
 
-// Initialize preflow
 void PushRelabelSequential::initialize(const std::vector<std::vector<FlowNetwork::Edge>>& graph,
                                      std::vector<int>& excess, std::vector<int>& height,
                                      std::queue<int>& active_vertices, std::vector<bool>& in_queue,
@@ -114,7 +110,6 @@ void PushRelabelSequential::initialize(const std::vector<std::vector<FlowNetwork
     }
 }
 
-// Push operation (single edge)
 bool PushRelabelSequential::push(std::vector<std::vector<FlowNetwork::Edge>>& graph,
                                std::vector<int>& excess, std::vector<int>& height,
                                std::queue<int>& active_vertices, std::vector<bool>& in_queue,
@@ -136,7 +131,6 @@ bool PushRelabelSequential::push(std::vector<std::vector<FlowNetwork::Edge>>& gr
     return true;
 }
 
-// Relabel node u
 bool PushRelabelSequential::relabel(const std::vector<std::vector<FlowNetwork::Edge>>& graph,
                                   std::vector<int>& height, int u, int n) {
     int min_h = INF_HEIGHT;
@@ -148,7 +142,6 @@ bool PushRelabelSequential::relabel(const std::vector<std::vector<FlowNetwork::E
     return true;
 }
 
-// Discharge excess at u
 int PushRelabelSequential::discharge(std::vector<std::vector<FlowNetwork::Edge>>& graph,
                                    std::vector<int>& excess, std::vector<int>& height,
                                    std::queue<int>& active_vertices, std::vector<bool>& in_queue,
@@ -169,7 +162,6 @@ int PushRelabelSequential::discharge(std::vector<std::vector<FlowNetwork::Edge>>
     return relabels;
 }
 
-// Global relabel via backward BFS
 void PushRelabelSequential::globalRelabel(std::vector<std::vector<FlowNetwork::Edge>>& graph,
                                          std::vector<int>& height, int source, int sink, int n) {
     height.assign(n, n);
@@ -196,7 +188,6 @@ void PushRelabelSequential::globalRelabel(std::vector<std::vector<FlowNetwork::E
     height[source] = n;
 }
 
-// Debug print state (unchanged)
 void PushRelabelSequential::printState(const std::vector<std::vector<FlowNetwork::Edge>>& graph,
                                      const std::vector<int>& excess, const std::vector<int>& height,
                                      const std::queue<int>& active_vertices, int n) {

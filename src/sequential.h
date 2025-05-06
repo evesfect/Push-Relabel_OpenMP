@@ -10,7 +10,7 @@
 class PushRelabelSequential {
 public:
     static const int MAX_ITERATIONS = 100000000;
-    static const int INF_HEIGHT = std::numeric_limits<int>::max(); // For global relabeling
+    static const int INF_HEIGHT = std::numeric_limits<int>::max(); // For GL
 
     static int maxFlow(FlowNetwork& network, int source, int sink);
     static void globalRelabel(std::vector<std::vector<FlowNetwork::Edge>>& graph,
@@ -40,4 +40,4 @@ private:
                           const std::queue<int>& active_vertices, int n);
 };
 
-#endif // SEQUENTIAL_H
+#endif
