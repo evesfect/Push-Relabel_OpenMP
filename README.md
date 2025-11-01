@@ -31,85 +31,16 @@ Three versions of Push-Relabel with different optimization levels:
 
 (FIFO becomes untestable for the graph sizes above 5000 due to incredible time cost)(GR = Global Relabeling Heuristics, DC = Discharge)
 
-Graph Size
+| Graph Size | FIFO (ms) | FIFO+GR (ms) | Parallel GR (ms) | Parallel DC (ms) |
+|------------|------------|----------------|------------------|-----------------|
+| 1000       | 6          | 5              | 5                | 7               |
+| 2000       | 2290       | 43             | 32               | 42              |
+| 5000       | 38109      | 305            | 168              | 164             |
+| 10000      | -          | 793            | 295              | 320             |
+| 20000      | -          | 8289           | 4842             | 3941            |
+| 30000      | -          | 13885          | 8762             | 6851            |
+| 40000      | -          | 63677          | 23164            | 16459           |
 
-FIFO (ms)
-
-FIFO+GR (ms)
-
-Parallel GR (ms)
-
-Parallel DC (ms)
-
-1000
-
-6
-
-5
-
-5
-
-7
-
-2000
-
-2290
-
-43
-
-32
-
-42
-
-5000
-
-38109
-
-305
-
-168
-
-164
-
-10000
-
--
-
-793
-
-295
-
-320
-
-20000
-
--
-
-8289
-
-4842
-
-3941
-
-30000
-
--
-
-13885
-
-8762
-
-6851
-
-40000
-
--
-
-63677
-
-23164
-
-16459
 
 ![alt text](image.png)
 
