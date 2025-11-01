@@ -42,6 +42,7 @@ Three versions of Push-Relabel with different optimization levels:
 | 40000      | -          | 63677          | 23164            | 16459           |
 
 
+
 ![alt text](image.png)
 
 ### Key Observations
@@ -75,13 +76,19 @@ make parallel              # Main executable: bin/max_flowmake benchmark-paralle
 ### Generate and Test Graphs
 
 ```bash
-# Generate random graphbin/max_flow -g 1000 0.3 1 100 bin/graph.dat# Verify with Boostbin/max_flow -t bin/graph.dat 0 999
+# Generate random graph
+bin/max_flow -g 1000 0.3 1 100 bin/graph.dat
+# Verify with Boost
+bin/max_flow -t bin/graph.dat 0 999
 ```
 
 ### Run Benchmarks
 
 ```bash
-# Default: 1000 vertices, density 0.3, 8 threadsbin/performance_test# Custombin/performance_test 20000 0.3 8
+# Default: 1000 vertices, density 0.3, 8 threads
+bin/performance_test
+# Custom
+bin/performance_test 20000 0.3 8
 ```
 
 Benchmark output compares all three implementations (Sequential+GR, Parallel GR, Fully Parallel).
