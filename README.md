@@ -66,7 +66,10 @@ Three versions of Push-Relabel with different optimization levels:
 ## Build
 
 ```bash
-make parallel              # Main executable: bin/max_flowmake benchmark-parallel    # Performance tests: bin/performance_testmake test                  # Correctness tests (runs automatically)make clean
+make parallel # Main executable: bin/max_flow
+make benchmark-parallel # Performance tests: bin/performance_test
+make test # Correctness tests (runs automatically)
+make clean
 ```
 
 **Note:** Only these targets are supported. Do not use `make sequential`.
